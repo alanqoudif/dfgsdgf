@@ -9,6 +9,9 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@radix-ui/react-dialog": "^1.1.6",
+    "@radix-ui/react-label": "^2.1.2",
+    "@radix-ui/react-slot": "^1.1.2",
     "@supabase/auth-helpers-nextjs": "^0.10.0",
     "@supabase/auth-helpers-react": "^0.5.0",
     "@supabase/ssr": "^0.6.1",
@@ -21,6 +24,7 @@
     "next": "14.1.0",
     "next-themes": "^0.2.1",
     "openai": "^4.28.0",
+    "posthog-js": "^1.232.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "sonner": "^1.4.0",
