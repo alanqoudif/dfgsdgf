@@ -304,8 +304,8 @@ export async function POST(req: Request) {
                             execute: async ({ text, to }: { text: string; to: string }) => {
                                 const { object: translation } = await generateObject({
                                     model: scira.languageModel(model),
-                                    system: `You are a helpful assistant that translates text from one language to another.`,
-                                    prompt: `Translate the following text to ${to} language: ${text}`,
+                                    system: `أنت مساعد مفيد يقوم بترجمة النصوص من لغة إلى أخرى. قم دائماً بالرد باللغة العربية عند التفاعل مع المستخدم.`,
+                                    prompt: `ترجم النص التالي إلى لغة ${to}: ${text}`,
                                     schema: z.object({
                                         translatedText: z.string(),
                                         detectedLanguage: z.string(),

@@ -1,84 +1,110 @@
-import { Analytics } from "@vercel/analytics/react";
+import "./globals.css";
+import type { Metadata, Viewport } from "next";
 import { GeistSans } from 'geist/font/sans';
+import { Tajawal, Montserrat } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/react';
+import { Toaster } from '@/components/ui/toaster';
+import { NuqsAdapter } from 'nuqs/adapters/next/app';
 import 'katex/dist/katex.min.css';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { Metadata, Viewport } from "next";
-import { Syne } from 'next/font/google';
-import { NuqsAdapter } from 'nuqs/adapters/next/app';
-import { Toaster } from "sonner";
-import "./globals.css";
 import { Providers } from './providers';
+import { LanguageProvider } from '@/app/language-context';
+import { ThemeProvider } from '@/components/ui/theme-provider';
+import { cn } from '@/lib/utils';
+
+const tajawal = Tajawal({
+  subsets: ['arabic'],
+  weight: ['400', '500', '700'],
+  variable: '--font-tajawal',
+  preload: true,
+  display: 'swap',
+});
+
+const montserrat = Montserrat({
+  subsets: ['latin'],
+  weight: ['400', '500', '700'],
+  variable: '--font-montserrat',
+  preload: true,
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://scira.ai"),
-  title: "Scira AI",
-  description: "Scira AI is a minimalistic AI-powered search engine that helps you find information on the internet.",
+  metadataBase: new URL('https://dhaki.ai'),
+  title: "ذكي | محرك بحث ذكي مدعوم بالذكاء الاصطناعي",
+  description: "ذكي هو محرك بحث مدعوم بالذكاء الاصطناعي. استفد من قوة الذكاء الاصطناعي للحصول على إجابات في الوقت الحالي.",
   openGraph: {
-    url: "https://scira.ai",
-    siteName: "Scira AI",
+    type: "website",
+    title: "ذكي | محرك بحث ذكي مدعوم بالذكاء الاصطناعي",
+    description: "ذكي هو محرك بحث مدعوم بالذكاء الاصطناعي. استفد من قوة الذكاء الاصطناعي للحصول على إجابات في الوقت الحالي.",
+    url: "https://dhaki.ai",
+    siteName: "Dhaki",
+    images: [{
+      url: "https://dhaki.ai/og-image.png",
+    }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ذكي | محرك بحث ذكي مدعوم بالذكاء الاصطناعي",
+    description: "ذكي هو محرك بحث مدعوم بالذكاء الاصطناعي. استفد من قوة الذكاء الاصطناعي للحصول على إجابات في الوقت الحالي.",
+    images: ["https://dhaki.ai/og-image.png"],
   },
   keywords: [
-    "scira.ai",
-    "scira ai",
-    "Scira AI",
-    "scira AI",
-    "SCIRA.AI",
-    "scira github",
+    "ذكي",
+    "محرك بحث",
+    "ذكاء اصطناعي",
+    "بحث ذكي",
+    "Dhaki",
+    "Dhaki AI",
     "ai search engine",
-    "Scira",
-    "scira",
-    "scira.app",
-    "scira ai",
-    "scira ai app",
-    "scira",
-    "MiniPerplx",
-    "Scira AI",
-    "open source ai search engine",
-    "minimalistic ai search engine",
-    "ai search engine",
-    "Scira (Formerly MiniPerplx)",
     "AI Search Engine",
-    "mplx.run",
-    "mplx ai",
-    "zaid mukaddam",
-    "scira.how",
+    "open source ai search engine",
     "search engine",
     "AI",
-    "perplexity",
   ]
 };
 
 export const viewport: Viewport = {
-  width: "device-width",
+  width: 'device-width',
   initialScale: 1,
-  minimumScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: 'cover',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#ffffff' },
-    { media: '(prefers-color-scheme: dark)', color: '#171717' }
+    { media: '(prefers-color-scheme: dark)', color: '#000000' },
   ],
-}
-
-const syne = Syne({ 
-  subsets: ['latin'], 
-  variable: '--font-syne',
-   preload: true,
-  display: 'swap',
-});
+};
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${GeistSans.variable} ${syne.variable} font-sans antialiased`}>
+    <html lang="ar" suppressHydrationWarning>
+      <head>
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700&display=swap" rel="stylesheet" />
+      </head>
+      <body className={cn("min-h-screen bg-background font-sans antialiased overflow-x-hidden", GeistSans.variable, tajawal.variable, montserrat.variable)} suppressHydrationWarning>
         <NuqsAdapter>
           <Providers>
-            <Toaster position="top-center" richColors theme="system" />
-            {children}
+            <LanguageProvider>
+              <ThemeProvider
+                attribute="class"
+                defaultTheme="system"
+                enableSystem
+                disableTransitionOnChange
+              >
+                {children}
+                <Toaster />
+              </ThemeProvider>
+            </LanguageProvider>
           </Providers>
         </NuqsAdapter>
         <Analytics />

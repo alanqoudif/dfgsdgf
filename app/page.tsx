@@ -33,7 +33,8 @@ import {
     TooltipTrigger,
 } from "@/components/ui/tooltip";
 import WeatherChart from '@/components/weather-chart';
-import { cn, getUserId, SearchGroupId } from '@/lib/utils';
+import { cn, getUserId } from '@/lib/utils';
+import { SearchGroupId } from '@/lib/search-groups';
 import { Wave } from "@foobar404/wave";
 import { CheckCircle, CurrencyDollar, Flag, Info, Memory, RoadHorizon, SoccerBall, TennisBall, XLogo } from '@phosphor-icons/react';
 import { TextIcon } from '@radix-ui/react-icons';
@@ -81,7 +82,8 @@ import {
     Clock,
     WrapText,
     ArrowLeftRight,
-    Mountain
+    Mountain,
+    MessageSquare
 } from 'lucide-react';
 import Marked, { ReactRenderer } from 'marked-react';
 import { useTheme } from 'next-themes';
@@ -118,7 +120,7 @@ import {
     DrawerTitle,
     DrawerTrigger,
 } from "@/components/ui/drawer";
-import FormComponent from '@/components/ui/form-component';
+import FormWrapper from '@/components/FormWrapper';
 import {
     HoverCard,
     HoverCardContent,
@@ -130,6 +132,9 @@ import ReasonSearch from '@/components/reason-search';
 import he from 'he';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import MemoryManager from '@/components/memory-manager';
+import { LanguageSwitcher } from '@/components/language-switcher';
+import { useLanguage } from '@/app/language-context';
+import { useQuestionLimit } from '@/hooks/useQuestionLimit';
 
 export const maxDuration = 120;
 
@@ -653,6 +658,7 @@ const HomeContent = () => {
     const [query] = useQueryState('query', parseAsString.withDefault(''))
     const [q] = useQueryState('q', parseAsString.withDefault(''))
     const [model] = useQueryState('model', parseAsString.withDefault('scira-default'))
+    const { translate, direction, language } = useLanguage();
 
     const initialState = useMemo(() => ({
         query: query || q,
@@ -1276,6 +1282,8 @@ const HomeContent = () => {
     interface NavbarProps { }
 
     const Navbar: React.FC<NavbarProps> = () => {
+        const { translate } = useLanguage();
+        
         return (
             <div className={cn(
                 "fixed top-0 left-0 right-0 z-[60] flex justify-between items-center p-4",
@@ -1291,25 +1299,27 @@ const HomeContent = () => {
                         >
                             <Plus size={18} className="group-hover:rotate-90 transition-all" />
                             <span className="text-sm ml-2 group-hover:block hidden animate-in fade-in duration-300">
-                                New
+                                {translate('جديد', 'New')}
                             </span>
                         </Button>
                     </Link>
                 </div>
-                <div className='flex items-center space-x-4'>
-                    <Link
-                        target="_blank"
-                        href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fzaidmukaddam%2Fscira&env=XAI_API_KEY,ANTHROPIC_API_KEY,CEREBRAS_API_KEY,GROQ_API_KEY,E2B_API_KEY,ELEVENLABS_API_KEY,TAVILY_API_KEY,EXA_API_KEY,TMDB_API_KEY,YT_ENDPOINT,FIRECRAWL_API_KEY,OPENWEATHER_API_KEY,SANDBOX_TEMPLATE_ID,GOOGLE_MAPS_API_KEY,MAPBOX_ACCESS_TOKEN,TRIPADVISOR_API_KEY,AVIATION_STACK_API_KEY,CRON_SECRET,BLOB_READ_WRITE_TOKEN,NEXT_PUBLIC_MAPBOX_TOKEN,NEXT_PUBLIC_POSTHOG_KEY,NEXT_PUBLIC_POSTHOG_HOST,NEXT_PUBLIC_GOOGLE_MAPS_API_KEY,MEM0_API_KEY,MEM0_ORG_NAME,MEM0_PROJECT_NAME&envDescription=API%20keys%20and%20configuration%20required%20for%20Scira%20to%20function"
-                        className="flex flex-row gap-2 items-center py-1.5 px-2 rounded-md 
-                            bg-accent hover:bg-accent/80
-                            backdrop-blur-sm text-foreground shadow-sm text-sm
-                            transition-all duration-200"
-                    >
-                        <VercelIcon size={14} />
-                        <span className='hidden sm:block'>Deploy with Vercel</span>
-                        <span className='sm:hidden block'>Deploy</span>
+
+                <div className="flex items-center gap-4">
+                    <LanguageSwitcher />
+                    <Link href="/about">
+                        <Button
+                            type="button"
+                            variant={'ghost'}
+                            className="rounded-full hover:bg-accent/10 backdrop-blur-sm transition-all hover:scale-105 pointer-events-auto"
+                        >
+                            <Info size={18} />
+                            <span className="text-sm ml-2 hidden md:block">
+                                {translate('حول', 'About')}
+                            </span>
+                        </Button>
                     </Link>
-                    <AboutButton />
+
                     <ThemeToggle />
                 </div>
             </div>
@@ -1399,7 +1409,7 @@ const HomeContent = () => {
                             <div className="flex items-center gap-2">
                                 <Sparkles className="size-5 text-primary" />
                                 <h2 className="text-base font-semibold text-neutral-800 dark:text-neutral-200">
-                                    Answer
+                                    {translate('الإجابة', 'Answer')}
                                 </h2>
                             </div>
                             {status === 'ready' && (
@@ -1624,12 +1634,15 @@ const HomeContent = () => {
     }, [messages, reasoningTimings]);
 
     const WidgetSection = memo(() => {
-        const [currentTime, setCurrentTime] = useState(new Date());
+        const [currentTime, setCurrentTime] = useState<Date | null>(null);
+        const [isMounted, setIsMounted] = useState(false);
         const timerRef = useRef<NodeJS.Timeout>();
 
         useEffect(() => {
+            setIsMounted(true);
             // Sync with the nearest second
             const now = new Date();
+            setCurrentTime(now);
             const delay = 1000 - now.getMilliseconds();
 
             // Initial sync
@@ -1651,25 +1664,25 @@ const HomeContent = () => {
         }, []);
 
         // Get user's timezone
-        const timezone = new Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const timezone = isMounted ? new Intl.DateTimeFormat().resolvedOptions().timeZone : '';
 
         // Format date and time with timezone
-        const dateFormatter = new Intl.DateTimeFormat('en-US', {
+        const dateFormatter = isMounted ? new Intl.DateTimeFormat('en-US', {
             weekday: 'short',
             month: 'short',
             day: 'numeric',
             timeZone: timezone
-        });
+        }) : null;
 
-        const timeFormatter = new Intl.DateTimeFormat('en-US', {
+        const timeFormatter = isMounted ? new Intl.DateTimeFormat('en-US', {
             hour: '2-digit',
             minute: '2-digit',
             hour12: true,
             timeZone: timezone
-        });
+        }) : null;
 
-        const formattedDate = dateFormatter.format(currentTime);
-        const formattedTime = timeFormatter.format(currentTime);
+        const formattedDate = currentTime && dateFormatter ? dateFormatter.format(currentTime) : '';
+        const formattedTime = currentTime && timeFormatter ? timeFormatter.format(currentTime) : '';
 
         const handleDateTimeClick = useCallback(() => {
             if (status !== 'ready') return;
@@ -1716,6 +1729,50 @@ const HomeContent = () => {
 
     WidgetSection.displayName = 'WidgetSection';
 
+    // مكون جديد لعرض استهلاك الرسائل
+    function MessageUsageDisplay() {
+      const { questionsLeft, isAnonymous, isLoading } = useQuestionLimit();
+      const { translate } = useLanguage();
+      
+      if (isLoading) return null; // لا نعرض شيئًا أثناء التحميل
+      
+      return (
+        <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-3 mb-4 shadow-sm border border-slate-200 dark:border-slate-800">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5 text-blue-500" />
+              <span className="font-medium">
+                {translate('رصيد الرسائل:', 'Message Balance:')}
+              </span>
+              <Badge variant={questionsLeft === 0 ? "destructive" : (questionsLeft || 0) < 3 ? "outline" : "default"}>
+                {questionsLeft !== null ? questionsLeft : '∞'} {translate('رسائل', 'messages')}
+              </Badge>
+            </div>
+            
+            {isAnonymous && (
+              <div className="flex items-center gap-2">
+                <Link href="/login" className="inline-flex items-center text-xs bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition-colors">
+                  {translate('تسجيل الدخول', 'Log In')}
+                </Link>
+                <Link href="/register" className="inline-flex items-center text-xs bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 transition-colors">
+                  {translate('إنشاء حساب', 'Sign Up')}
+                </Link>
+              </div>
+            )}
+          </div>
+          
+          {isAnonymous && (
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              {translate(
+                'سجل دخولك للحصول على المزيد من الرسائل يوميًا ومميزات إضافية!',
+                'Sign in to get more daily messages and additional features!'
+              )}
+            </p>
+          )}
+        </div>
+      );
+    }
+
     return (
         <div className="flex flex-col !font-sans items-center min-h-screen bg-background text-foreground transition-all duration-500">
             <Navbar />
@@ -1727,8 +1784,8 @@ const HomeContent = () => {
                 <div className={`w-full max-w-[90%] !font-sans sm:max-w-2xl space-y-6 p-0 mx-auto transition-all duration-300`}>
                     {status === 'ready' && messages.length === 0 && (
                         <div className="text-center !font-sans">
-                            <h1 className="text-2xl sm:text-4xl mb-6 text-neutral-800 dark:text-neutral-100 font-syne">
-                                What do you want to explore?
+                            <h1 className={`text-2xl sm:text-4xl mb-6 text-neutral-800 dark:text-neutral-100 ${language === 'ar' ? 'font-tajawal' : 'font-montserrat'}`}>
+                                {translate("ايش ودك تكتشف مع ذكي؟", "What would you like to explore with Dhaki?")}
                             </h1>
                         </div>
                     )}
@@ -1740,7 +1797,9 @@ const HomeContent = () => {
                                 transition={{ duration: 0.5 }}
                                 className='!mt-4'
                             >
-                                <FormComponent
+                                {/* عرض استهلاك الرسائل مزال */}
+                                
+                                <FormWrapper
                                     input={input}
                                     setInput={setInput}
                                     attachments={attachments}
@@ -1956,7 +2015,7 @@ const HomeContent = () => {
                             transition={{ duration: 0.5 }}
                             className="fixed bottom-4 left-0 right-0 w-full max-w-[90%] sm:max-w-2xl mx-auto"
                         >
-                            <FormComponent
+                            <FormWrapper
                                 input={input}
                                 setInput={setInput}
                                 attachments={attachments}
@@ -2182,7 +2241,22 @@ const ToolInvocationListView = memo(
 
                     const PREVIEW_COUNT = 3;
 
-                    const FullTweetList = memo(() => (
+                    const FullTweetList = memo(() => {
+                        const [isMounted, setIsMounted] = useState(false);
+                        
+                        useEffect(() => {
+                            setIsMounted(true);
+                        }, []);
+                        
+                        if (!isMounted) {
+                            return <div className="grid gap-4 p-4 sm:max-w-[500px]">
+                                {result.map((post: XResult, index: number) => (
+                                    <div key={post.id} className="h-[200px] bg-neutral-100 dark:bg-neutral-800 rounded-xl animate-pulse"></div>
+                                ))}
+                            </div>;
+                        }
+                        
+                        return (
                         <div className="grid gap-4 p-4 sm:max-w-[500px]">
                             {result.map((post: XResult, index: number) => (
                                 <motion.div
@@ -2196,7 +2270,7 @@ const ToolInvocationListView = memo(
                                 </motion.div>
                             ))}
                         </div>
-                    ));
+                    )});
 
                     FullTweetList.displayName = 'FullTweetList';
 

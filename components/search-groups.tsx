@@ -1,7 +1,7 @@
 import React from 'react'
 import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { searchGroups, type SearchGroup } from '@/lib/utils'
+import { searchGroups, type SearchGroup } from '@/lib/search-groups'
 import { cn } from '@/lib/utils'
 
 interface SearchGroupsProps {

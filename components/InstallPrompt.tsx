@@ -3,11 +3,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Share, Plus, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useLanguage } from '@/app/language-context';
+import Image from 'next/image';
 
 export function InstallPrompt() {
   const [showPrompt, setShowPrompt] = useState(false);
   const [platform, setPlatform] = useState<'ios' | 'android' | 'chrome' | 'other'>('other');
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const { language, translate } = useLanguage();
 
   useEffect(() => {
     const isDismissed = localStorage.getItem('installPromptDismissed');
@@ -65,22 +68,40 @@ export function InstallPrompt() {
       case 'ios':
         return (
           <p className="text-neutral-600 dark:text-neutral-400">
-            Tap <Share className="inline h-4 w-4 mx-1" /> and then{" "}
+            {translate(
+              "اضغط على", 
+              "Tap"
+            )} <Share className={`inline h-4 w-4 ${language === 'ar' ? 'mr-1 ml-1' : 'mx-1'}`} /> {translate(
+              "ثم",
+              "and then"
+            )}{" "}
             <span className="whitespace-nowrap">
-              &ldquo;Add to Home Screen&rdquo; <Plus className="inline h-4 w-4 ml-1" />
+              {translate(
+                "\"إضافة إلى الشاشة الرئيسية\"",
+                "\"Add to Home Screen\""
+              )} <Plus className={`inline h-4 w-4 ${language === 'ar' ? 'mr-1' : 'ml-1'}`} />
             </span>
           </p>
         );
       case 'android':
         return (
           <p className="text-neutral-600 dark:text-neutral-400">
-            Tap the menu <span className="font-bold">⋮</span> and select &ldquo;Install app&rdquo;
+            {translate(
+              "اضغط على القائمة",
+              "Tap the menu"
+            )} <span className="font-bold">⋮</span> {translate(
+              "ثم اختر \"تثبيت التطبيق\"",
+              "and select \"Install app\""
+            )}
           </p>
         );
       default:
         return (
           <p className="text-neutral-600 dark:text-neutral-400">
-            Install our app for a better experience <Download className="inline h-4 w-4 ml-1" />
+            {translate(
+              "قم بتثبيت التطبيق للحصول على تجربة أفضل",
+              "Install our app for a better experience"
+            )} <Download className={`inline h-4 w-4 ${language === 'ar' ? 'mr-1' : 'ml-1'}`} />
           </p>
         );
     }
@@ -97,11 +118,20 @@ export function InstallPrompt() {
         >
           <Card className="p-4 bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-lg">
             <div className="flex items-start justify-between">
-              <div className="space-y-2">
-                <h3 className="font-medium text-xl text-neutral-900 dark:text-neutral-100">
-                  Install Scira
-                </h3>
-                {getInstructions()}
+              <div className={`flex items-center gap-3 ${language === 'ar' ? 'font-tajawal' : 'font-montserrat'}`}>
+                <Image 
+                  src="/dhaki_logo-removebg-preview.png" 
+                  width={40} 
+                  height={40} 
+                  alt="ذكي" 
+                  className="object-contain" 
+                />
+                <div className="space-y-2">
+                  <h3 className="font-medium text-xl text-neutral-900 dark:text-neutral-100">
+                    {translate("تثبيت ذكي", "Install Dhaki")}
+                  </h3>
+                  {getInstructions()}
+                </div>
               </div>
               <Button
                 variant="ghost"
@@ -115,19 +145,19 @@ export function InstallPrompt() {
             </div>
 
             {platform !== 'ios' && (
-              <div className="mt-4 flex justify-end gap-2">
+              <div className={`mt-4 flex justify-end gap-2 ${language === 'ar' ? 'font-tajawal' : 'font-montserrat'}`}>
                 <Button
                   variant="secondary"
                   size="sm"
                   onClick={handleDismiss}
                 >
-                  Maybe later
+                  {translate("ربما لاحقًا", "Maybe later")}
                 </Button>
                 <Button
                   size="sm"
                   onClick={handleInstall}
                 >
-                  Install
+                  {translate("تثبيت", "Install")}
                 </Button>
               </div>
             )}

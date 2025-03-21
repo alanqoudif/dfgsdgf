@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 // /components/ui/form-component.tsx
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChatRequestOptions, CreateMessage, Message } from 'ai';
 import { toast } from 'sonner';
@@ -15,11 +15,17 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { cn, SearchGroup, SearchGroupId, searchGroups } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { SearchGroup, SearchGroupId, searchGroups } from '@/lib/search-groups';
 import { TextMorph } from '@/components/core/text-morph';
 import { Upload } from 'lucide-react';
 import { Mountain } from "lucide-react"
 import { UIMessage } from '@ai-sdk/ui-utils';
+import { useLanguage } from '@/app/language-context';
+import SuggestedQuestions from './suggested-questions';
+import { useQuestionLimit } from '@/hooks/useQuestionLimit';
+import { QuestionLimitWarning } from '@/components/QuestionLimitWarning';
+import { useAuth } from '@/hooks/useAuth';
 
 interface ModelSwitcherProps {
     selectedModel: string;
@@ -60,11 +66,9 @@ const AnthropicIcon = ({ className }: { className?: string }) => (
 );
 
 const models = [
-    { value: "scira-default", label: "Grok 2.0", icon: XAIIcon, iconClass: "!text-neutral-300", description: "xAI's Grok 2.0 model", color: "glossyblack", vision: false, experimental: false, category: "Stable" },
-    { value: "scira-vision", label: "Grok 2.0 Vision", icon: XAIIcon, iconClass: "!text-neutral-300", description: "xAI's Grok 2.0 Vision model", color: "steel", vision: true, experimental: false, category: "Stable" },
-    { value: "scira-sonnet", label: "Claude 3.7 Sonnet", icon: AnthropicIcon, iconClass: "!text-neutral-900 dark:!text-white", description: "Anthropic's G.O.A.T. model", color: "purple", vision: true, experimental: false, category: "Stable" },
-    { value: "scira-llama", label: "Llama 3.3 70B", icon: "/cerebras.png", iconClass: "!text-neutral-900 dark:!text-white", description: "Meta's Llama model by Cerebras", color: "offgray", vision: false, experimental: true, category: "Experimental" },
-    { value: "scira-r1", label: "DeepSeek R1 Distilled", icon: "/groq.svg", iconClass: "!text-neutral-900 dark:!text-white", description: "DeepSeek R1 model by Groq", color: "sapphire", vision: false, experimental: true, category: "Experimental" },
+    { value: "dhaki-plus", label: "ذكي بلس", icon: XAIIcon, iconClass: "!text-neutral-300", description: "نموذج قوي للاستخدامات العامة", englishLabel: "Dhaki Plus", englishDescription: "Powerful model for general use", color: "glossyblack", vision: false, experimental: false, category: "أساسي" },
+    { value: "dhaki-plus-vision", label: "ذكي بلس للصور", icon: XAIIcon, iconClass: "!text-neutral-300", description: "يدعم تحليل الصور والإجابة على الأسئلة المتعلقة بها", englishLabel: "Dhaki Plus Vision", englishDescription: "Supports analyzing images and answering related questions", color: "steel", vision: true, experimental: false, category: "أساسي" },
+    { value: "dhaki-plus-pro", label: "ذكي بلس برو", icon: AnthropicIcon, iconClass: "!text-neutral-900 dark:!text-white", description: "نموذج متقدم للأسئلة المعقدة", englishLabel: "Dhaki Plus Pro", englishDescription: "Advanced model for complex questions", color: "purple", vision: true, experimental: false, category: "أساسي" },
 ];
 
 const getColorClasses = (color: string, isSelected: boolean = false) => {
@@ -107,6 +111,7 @@ const ModelSwitcher: React.FC<ModelSwitcherProps> = ({ selectedModel, setSelecte
     const selectedModelData = models.find(model => model.value === selectedModel);
     const [isOpen, setIsOpen] = useState(false);
     const isProcessing = status === 'submitted' || status === 'streaming';
+    const { language } = useLanguage();
 
     // Check for attachments in current and previous messages
     const hasAttachments = attachments.length > 0 || messages.some(msg =>
@@ -130,7 +135,16 @@ const ModelSwitcher: React.FC<ModelSwitcherProps> = ({ selectedModel, setSelecte
 
     // Only show divider if we have multiple categories and no attachments
     const showDivider = (category: string) => {
-        return !hasAttachments && showExperimentalModels && category === "Stable";
+        return !hasAttachments && showExperimentalModels && category === "أساسي";
+    };
+
+    // Get the appropriate label and description based on language
+    const getModelLabel = (model: typeof models[0]) => {
+        return language === 'ar' ? model.label : model.englishLabel || model.label;
+    };
+    
+    const getModelDescription = (model: typeof models[0]) => {
+        return language === 'ar' ? model.description : model.englishDescription || model.description;
     };
 
     return (
@@ -155,7 +169,7 @@ const ModelSwitcher: React.FC<ModelSwitcherProps> = ({ selectedModel, setSelecte
                     typeof selectedModelData.icon === 'string' ? (
                         <img
                             src={selectedModelData.icon}
-                            alt={selectedModelData.label}
+                            alt={getModelLabel(selectedModelData)}
                             className={cn(
                                 "w-3.5 h-3.5 object-contain",
                                 selectedModelData.iconClass
@@ -170,7 +184,7 @@ const ModelSwitcher: React.FC<ModelSwitcherProps> = ({ selectedModel, setSelecte
                         />
                     )
                 )}
-                <span className="hidden sm:block text-xs font-medium overflow-hidden">
+                <span className={`hidden sm:block text-xs font-medium overflow-hidden ${language === 'ar' ? 'font-tajawal' : 'font-montserrat'}`}>
                     <TextMorph
                         variants={{
                             initial: { opacity: 0, y: 10 },
@@ -184,7 +198,7 @@ const ModelSwitcher: React.FC<ModelSwitcherProps> = ({ selectedModel, setSelecte
                             mass: 0.5
                         }}
                     >
-                        {selectedModelData?.label || ""}
+                        {selectedModelData ? getModelLabel(selectedModelData) : ""}
                     </TextMorph>
                 </span>
             </DropdownMenuTrigger>
@@ -225,7 +239,7 @@ const ModelSwitcher: React.FC<ModelSwitcherProps> = ({ selectedModel, setSelecte
                                         {typeof model.icon === 'string' ? (
                                             <img
                                                 src={model.icon}
-                                                alt={model.label}
+                                                alt={getModelLabel(model)}
                                                 className={cn(
                                                     "w-3 h-3 object-contain",
                                                     model.iconClass
@@ -240,9 +254,9 @@ const ModelSwitcher: React.FC<ModelSwitcherProps> = ({ selectedModel, setSelecte
                                             />
                                         )}
                                     </div>
-                                    <div className="flex flex-col gap-px min-w-0">
-                                        <div className="font-medium truncate">{model.label}</div>
-                                        <div className="text-[10px] opacity-80 truncate leading-tight">{model.description}</div>
+                                    <div className={`flex flex-col gap-px min-w-0 ${language === 'ar' ? 'font-tajawal' : 'font-montserrat'}`}>
+                                        <div className="font-medium truncate">{getModelLabel(model)}</div>
+                                        <div className="text-[10px] opacity-80 truncate leading-tight">{getModelDescription(model)}</div>
                                     </div>
                                 </DropdownMenuItem>
                             ))}
@@ -726,6 +740,7 @@ const FormComponent: React.FC<FormComponentProps> = ({
     status,
     setHasSubmitted,
 }) => {
+    const { translate, language, direction } = useLanguage();
     const [uploadQueue, setUploadQueue] = useState<Array<string>>([]);
     const isMounted = useRef(true);
     const { width } = useWindowSize();
@@ -734,6 +749,23 @@ const FormComponent: React.FC<FormComponentProps> = ({
     const [isDragging, setIsDragging] = useState(false);
     const [isGroupSelectorExpanded, setIsGroupSelectorExpanded] = useState(false);
     const [isExceedingLimit, setIsExceedingLimit] = useState(false);
+    const [showSuggestions, setShowSuggestions] = useState(true);
+
+    // Use the question limit hook
+    const { 
+        questionsLeft, 
+        daysToReset, 
+        hasReachedLimit, 
+        isAnonymous, 
+        handleQuestionSubmit 
+    } = useQuestionLimit();
+
+    const { user } = useAuth();
+
+    // Get placeholder text based on current language
+    const getPlaceholderText = () => {
+        return translate("اسأل أي شيء...", "Ask anything...");
+    };
 
     // Add a ref to track the initial group selection
     const initialGroupRef = useRef(selectedGroup);
@@ -757,10 +789,11 @@ const FormComponent: React.FC<FormComponentProps> = ({
         // Check if input exceeds character limit
         if (newValue.length > MAX_INPUT_CHARS) {
             setIsExceedingLimit(true);
-            // Optional: You can truncate the input here or just warn the user
-            // setInput(newValue.substring(0, MAX_INPUT_CHARS));
             setInput(newValue);
-            toast.error(`Your input exceeds the maximum of ${MAX_INPUT_CHARS} characters.`);
+            toast.error(translate(
+                `النص يتجاوز الحد الأقصى ${MAX_INPUT_CHARS} حرف.`,
+                `Your input exceeds the maximum of ${MAX_INPUT_CHARS} characters.`
+            ));
         } else {
             setIsExceedingLimit(false);
             setInput(newValue);
@@ -800,7 +833,10 @@ const FormComponent: React.FC<FormComponentProps> = ({
             }
         } catch (error) {
             console.error("Error uploading file:", error);
-            toast.error("Failed to upload file, please try again!");
+            toast.error(translate(
+                "فشل رفع الملف، يرجى المحاولة مرة أخرى!",
+                "Failed to upload file, please try again!"
+            ));
             throw error;
         }
     };
@@ -810,7 +846,10 @@ const FormComponent: React.FC<FormComponentProps> = ({
         const totalAttachments = attachments.length + files.length;
 
         if (totalAttachments > MAX_IMAGES) {
-            toast.error(`You can only attach up to ${MAX_IMAGES} images.`);
+            toast.error(translate(
+                `يمكنك إرفاق ${MAX_IMAGES} صور كحد أقصى.`,
+                `You can only attach up to ${MAX_IMAGES} images.`
+            ));
             return;
         }
 
@@ -825,12 +864,15 @@ const FormComponent: React.FC<FormComponentProps> = ({
             ]);
         } catch (error) {
             console.error("Error uploading files!", error);
-            toast.error("Failed to upload one or more files. Please try again.");
+            toast.error(translate(
+                "فشل رفع واحد أو أكثر من الملفات. يرجى المحاولة مرة أخرى.",
+                "Failed to upload one or more files. Please try again."
+            ));
         } finally {
             setUploadQueue([]);
             event.target.value = '';
         }
-    }, [attachments, setAttachments]);
+    }, [attachments, setAttachments, translate]);
 
     const removeAttachment = (index: number) => {
         setAttachments(prev => prev.filter((_, i) => i !== index));
@@ -866,13 +908,19 @@ const FormComponent: React.FC<FormComponentProps> = ({
         );
 
         if (files.length === 0) {
-            toast.error("Only image files are supported");
+            toast.error(translate(
+                "يتم دعم ملفات الصور فقط",
+                "Only image files are supported"
+            ));
             return;
         }
 
         const totalAttachments = attachments.length + files.length;
         if (totalAttachments > MAX_IMAGES) {
-            toast.error(`You can only attach up to ${MAX_IMAGES} images.`);
+            toast.error(translate(
+                `يمكنك إرفاق ${MAX_IMAGES} صور كحد أقصى.`,
+                `You can only attach up to ${MAX_IMAGES} images.`
+            ));
             return;
         }
 
@@ -881,7 +929,10 @@ const FormComponent: React.FC<FormComponentProps> = ({
         if (!currentModel?.vision) {
             const visionModel = getFirstVisionModel();
             setSelectedModel(visionModel);
-            toast.success(`Switched to ${models.find(m => m.value === visionModel)?.label} for image support`);
+            toast.success(translate(
+                `تم التبديل إلى ${models.find(m => m.value === visionModel)?.label} لدعم الصورة`,
+                `Switched to ${models.find(m => m.value === visionModel)?.label} for image support`
+            ));
         }
 
         setUploadQueue(files.map((file) => file.name));
@@ -895,11 +946,14 @@ const FormComponent: React.FC<FormComponentProps> = ({
             ]);
         } catch (error) {
             console.error("Error uploading files!", error);
-            toast.error("Failed to upload one or more files. Please try again.");
+            toast.error(translate(
+                "فشل رفع واحد أو أكثر من الملفات. يرجى المحاولة مرة أخرى.",
+                "Failed to upload one or more files. Please try again."
+            ));
         } finally {
             setUploadQueue([]);
         }
-    }, [attachments.length, setAttachments, uploadFile, selectedModel, setSelectedModel, getFirstVisionModel]);
+    }, [attachments.length, setAttachments, uploadFile, selectedModel, setSelectedModel, getFirstVisionModel, translate]);
 
     const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
         const items = Array.from(e.clipboardData.items);
@@ -912,7 +966,10 @@ const FormComponent: React.FC<FormComponentProps> = ({
 
         const totalAttachments = attachments.length + imageItems.length;
         if (totalAttachments > MAX_IMAGES) {
-            toast.error(`You can only attach up to ${MAX_IMAGES} images.`);
+            toast.error(translate(
+                `يمكنك إرفاق ${MAX_IMAGES} صور كحد أقصى.`,
+                `You can only attach up to ${MAX_IMAGES} images.`
+            ));
             return;
         }
 
@@ -921,7 +978,10 @@ const FormComponent: React.FC<FormComponentProps> = ({
         if (!currentModel?.vision) {
             const visionModel = getFirstVisionModel();
             setSelectedModel(visionModel);
-            toast.success(`Switched to ${models.find(m => m.value === visionModel)?.label} for image support`);
+            toast.success(translate(
+                `تم التبديل إلى ${models.find(m => m.value === visionModel)?.label} لدعم الصورة`,
+                `Switched to ${models.find(m => m.value === visionModel)?.label} for image support`
+            ));
         }
 
         setUploadQueue(imageItems.map((_, i) => `Pasted Image ${i + 1}`));
@@ -936,14 +996,20 @@ const FormComponent: React.FC<FormComponentProps> = ({
                 ...uploadedAttachments,
             ]);
 
-            toast.success('Image pasted successfully');
+            toast.success(translate(
+                'تم النسخ النقاطي بنجاح',
+                'Image pasted successfully'
+            ));
         } catch (error) {
             console.error("Error uploading pasted files!", error);
-            toast.error("Failed to upload pasted image. Please try again.");
+            toast.error(translate(
+                "فشل رفع الصورة الملصقة. يرجى المحاولة مرة أخرى.",
+                "Failed to upload pasted image. Please try again."
+            ));
         } finally {
             setUploadQueue([]);
         }
-    }, [attachments.length, setAttachments, uploadFile, selectedModel, setSelectedModel, getFirstVisionModel]);
+    }, [attachments.length, setAttachments, uploadFile, selectedModel, setSelectedModel, getFirstVisionModel, translate]);
 
     useEffect(() => {
         if (status !== 'ready' && inputRef.current) {
@@ -965,21 +1031,46 @@ const FormComponent: React.FC<FormComponentProps> = ({
         event.stopPropagation();
 
         if (status !== 'ready') {
-            toast.error("Please wait for the current response to complete!");
+            toast.error(translate(
+                "يرجى الانتظار حتى تكتمل الاستجابة الحالية!",
+                "Please wait for the current response to complete!"
+            ));
             return;
         }
 
         // Check if input exceeds character limit
         if (input.length > MAX_INPUT_CHARS) {
-            toast.error(`Your input exceeds the maximum of ${MAX_INPUT_CHARS} characters. Please shorten your message.`);
+            toast.error(translate(
+                `النص يتجاوز الحد الأقصى ${MAX_INPUT_CHARS} حرف. يرجى تقصير رسالتك.`,
+                `Your input exceeds the maximum of ${MAX_INPUT_CHARS} characters. Please shorten your message.`
+            ));
             return;
         }
 
         if (input.trim() || attachments.length > 0) {
-            setHasSubmitted(true);
-            lastSubmittedQueryRef.current = input.trim();
+            // Check question limit before proceeding
+            handleQuestionSubmit().then(({ canProceed }) => {
+                if (canProceed) {
+                    setHasSubmitted(true);
+                    lastSubmittedQueryRef.current = input.trim();
+    
+                    // Use our own submit handler with error handling
+                    submitWithErrorHandling(event);
+                }
+                // If canProceed is false, the hook will have already shown an error toast
+            });
+        } else {
+            toast.error(translate(
+                "يرجى إدخال استعلام بحث أو إرفاق صورة.",
+                "Please enter a search query or attach an image."
+            ));
+        }
+    }, [input, attachments, setHasSubmitted, lastSubmittedQueryRef, status, translate, handleQuestionSubmit]);
 
-            handleSubmit(event, {
+    // New function to handle errors in submission
+    const submitWithErrorHandling = async (event: React.FormEvent<HTMLFormElement>) => {
+        try {
+            await handleSubmit(event, {
                 experimental_attachments: attachments,
             });
 
@@ -987,23 +1078,50 @@ const FormComponent: React.FC<FormComponentProps> = ({
             if (fileInputRef.current) {
                 fileInputRef.current.value = '';
             }
-        } else {
-            toast.error("Please enter a search query or attach an image.");
+        } catch (error: any) {
+            // Check if the error is a response object
+            if (error.status === 403) {
+                const errorData = await error.json();
+                if (errorData.error === 'Limit reached') {
+                    toast.error(translate(
+                        'لقد وصلت إلى الحد الأقصى للأسئلة. يرجى تسجيل الدخول للاستمرار.',
+                        'You have reached your question limit. Please sign in to continue.'
+                    ));
+                    
+                    // Redirect to login page after a short delay
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
+                    
+                    return;
+                }
+            }
+            
+            // Handle other errors
+            toast.error(translate(
+                'حدث خطأ أثناء معالجة طلبك. يرجى المحاولة مرة أخرى.',
+                'An error occurred while processing your request. Please try again.'
+            ));
+            console.error('Error submitting form:', error);
         }
-    }, [input, attachments, handleSubmit, setAttachments, fileInputRef, lastSubmittedQueryRef, status]);
+    };
 
     const submitForm = useCallback(() => {
-        onSubmit({ preventDefault: () => { }, stopPropagation: () => { } } as React.FormEvent<HTMLFormElement>);
+        handleSubmit({ preventDefault: () => { } });
         resetSuggestedQuestions();
+        setShowSuggestions(false);
 
         if (width && width > 768) {
             inputRef.current?.focus();
         }
-    }, [onSubmit, resetSuggestedQuestions, width, inputRef]);
+    }, [handleSubmit, resetSuggestedQuestions, width, inputRef]);
 
     const triggerFileInput = useCallback(() => {
         if (attachments.length >= MAX_IMAGES) {
-            toast.error(`You can only attach up to ${MAX_IMAGES} images.`);
+            toast.error(translate(
+                `يمكنك إرفاق ${MAX_IMAGES} صور كحد أقصى.`,
+                `You can only attach up to ${MAX_IMAGES} images.`
+            ));
             return;
         }
 
@@ -1012,13 +1130,16 @@ const FormComponent: React.FC<FormComponentProps> = ({
         } else {
             fileInputRef.current?.click();
         }
-    }, [attachments.length, status, fileInputRef]);
+    }, [attachments.length, status, fileInputRef, translate]);
 
     const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (event.key === "Enter" && !event.shiftKey) {
             event.preventDefault();
             if (status === 'submitted' || status === 'streaming') {
-                toast.error("Please wait for the response to complete!");
+                toast.error(translate(
+                    "يرجى الانتظار حتى تكتمل الاستجابة!",
+                    "Please wait for the response to complete!"
+                ));
             } else {
                 submitForm();
                 if (width && width > 768) {
@@ -1034,230 +1155,265 @@ const FormComponent: React.FC<FormComponentProps> = ({
     const hasInteracted = messages.length > 0;
     const isMobile = width ? width < 768 : false;
 
+    const handleQuestionClick = (question: string) => {
+        setInput(question);
+        if (inputRef.current) {
+            inputRef.current.focus();
+        }
+    };
+
+    useEffect(() => {
+        if (messages.length === 0) {
+            setShowSuggestions(true);
+        }
+    }, [messages.length]);
+
     return (
-        <div
-            className={cn(
-                "relative w-full flex flex-col gap-2 rounded-lg transition-all duration-300 !font-sans",
-                hasInteracted ? "z-[51]" : "",
-                isDragging && "ring-1 ring-neutral-300 dark:ring-neutral-700",
-                attachments.length > 0 || uploadQueue.length > 0
-                    ? "bg-gray-100/70 dark:bg-neutral-800 p-1"
-                    : "bg-transparent"
-            )}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-        >
-            <AnimatePresence>
-                {isDragging && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="absolute inset-0 backdrop-blur-[2px] bg-background/80 dark:bg-neutral-900/80 rounded-lg border border-dashed border-neutral-300 dark:border-neutral-700 flex items-center justify-center z-50 m-2"
-                    >
-                        <div className="flex items-center gap-4 px-6 py-8">
-                            <div className="p-3 rounded-full bg-neutral-100 dark:bg-neutral-800 shadow-sm">
-                                <Upload className="h-6 w-6 text-neutral-600 dark:text-neutral-400" />
-                            </div>
-                            <div className="space-y-1 text-center">
-                                <p className="text-sm font-medium text-neutral-600 dark:text-neutral-400">
-                                    Drop images here
-                                </p>
-                                <p className="text-xs text-neutral-500 dark:text-neutral-500">
-                                    Max {MAX_IMAGES} images
-                                </p>
-                            </div>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            <input type="file" className="hidden" ref={fileInputRef} multiple onChange={handleFileChange} accept="image/*" tabIndex={-1} />
-            <input type="file" className="hidden" ref={postSubmitFileInputRef} multiple onChange={handleFileChange} accept="image/*" tabIndex={-1} />
-
-            {(attachments.length > 0 || uploadQueue.length > 0) && (
-                <div className="flex flex-row gap-2 overflow-x-auto py-2 max-h-32 z-10 px-1">
-                    {attachments.map((attachment, index) => (
-                        <AttachmentPreview
-                            key={attachment.url}
-                            attachment={attachment}
-                            onRemove={() => removeAttachment(index)}
-                            isUploading={false}
-                        />
-                    ))}
-                    {uploadQueue.map((filename) => (
-                        <AttachmentPreview
-                            key={filename}
-                            attachment={{
-                                url: "",
-                                name: filename,
-                                contentType: "",
-                                size: 0,
-                            } as Attachment}
-                            onRemove={() => { }}
-                            isUploading={true}
-                        />
-                    ))}
-                </div>
-            )}
-
-            <div className="relative rounded-lg bg-neutral-100 dark:bg-neutral-900">
-                <Textarea
-                    ref={inputRef}
-                    placeholder={hasInteracted ? "Ask a new question..." : "Ask a question..."}
-                    value={input}
-                    onChange={handleInput}
-                    disabled={isProcessing}
-                    onFocus={handleFocus}
-                    onBlur={handleBlur}
+        <div className="w-full mx-auto">
+            <form onSubmit={onSubmit} className="relative w-full">
+                <div
                     className={cn(
-                        "min-h-[72px] w-full resize-none rounded-lg",
-                        "text-base leading-relaxed",
-                        "bg-neutral-100 dark:bg-neutral-900",
-                        "border !border-neutral-200 dark:!border-neutral-700",
-                        "focus:!border-neutral-300 dark:focus:!border-neutral-600",
-                        isFocused ? "!border-neutral-300 dark:!border-neutral-600" : "",
-                        "text-neutral-900 dark:text-neutral-100",
-                        "focus:!ring-1 focus:!ring-neutral-300 dark:focus:!ring-neutral-600",
-                        "px-4 py-4 pb-16",
-                        "overflow-y-auto",
-                        "touch-manipulation",
+                        "relative w-full flex flex-col gap-2 rounded-lg transition-all duration-300 !font-sans",
+                        hasInteracted ? "z-[51]" : "",
+                        isDragging && "ring-1 ring-neutral-300 dark:ring-neutral-700",
+                        attachments.length > 0 || uploadQueue.length > 0
+                            ? "bg-gray-100/70 dark:bg-neutral-800 p-1"
+                            : "bg-transparent"
                     )}
-                    style={{
-                        maxHeight: `${MAX_HEIGHT}px`,
-                        WebkitUserSelect: 'text',
-                        WebkitTouchCallout: 'none',
-                    }}
-                    rows={1}
-                    autoFocus={width ? width > 768 : true}
-                    onKeyDown={handleKeyDown}
-                    onPaste={handlePaste}
-                />
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                >
+                    <AnimatePresence>
+                        {isDragging && (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                className="absolute inset-0 backdrop-blur-[2px] bg-background/80 dark:bg-neutral-900/80 rounded-lg border border-dashed border-neutral-300 dark:border-neutral-700 flex items-center justify-center z-50 m-2"
+                            >
+                                <div className="flex items-center gap-4 px-6 py-8">
+                                    <div className="p-3 rounded-full bg-neutral-100 dark:bg-neutral-800 shadow-sm">
+                                        <Upload className="h-6 w-6 text-neutral-600 dark:text-neutral-400" />
+                                    </div>
+                                    <div className="space-y-1 text-center">
+                                        <p className="text-sm font-medium text-neutral-600 dark:text-neutral-400">
+                                            {translate("أسقط الصور هنا", "Drop images here")}
+                                        </p>
+                                        <p className="text-xs text-neutral-500 dark:text-neutral-500">
+                                            {translate(`الحد الأقصى ${MAX_IMAGES} صور`, `Max ${MAX_IMAGES} images`)}
+                                        </p>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
 
-                {/* Character counter with responsive positioning */}
-                {input.length > 0 && (
-                    <div className="absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 z-10">
-                        <CharacterCounter current={input.length} max={MAX_INPUT_CHARS} />
-                    </div>
-                )}
+                    <input type="file" className="hidden" ref={fileInputRef} multiple onChange={handleFileChange} accept="image/*" tabIndex={-1} />
+                    <input type="file" className="hidden" ref={postSubmitFileInputRef} multiple onChange={handleFileChange} accept="image/*" tabIndex={-1} />
 
-                <div className={cn(
-                    "absolute bottom-0 inset-x-0 flex justify-between items-center p-2 rounded-b-lg",
-                    "bg-neutral-100 dark:bg-neutral-900",
-                    "!border !border-t-0 !border-neutral-200 dark:!border-neutral-700",
-                    isFocused ? "!border-neutral-300 dark:!border-neutral-600" : "",
-                    isProcessing ? "!opacity-20 !cursor-not-allowed" : ""
-                )}>
-                    <div className={cn(
-                        "flex items-center gap-2",
-                        isMobile && "overflow-hidden"
-                    )}>
-                        <div className={cn(
-                            "transition-all duration-100",
-                            (selectedGroup !== 'extreme')
-                                ? "opacity-100 visible w-auto"
-                                : "opacity-0 invisible w-0"
-                        )}>
-                            <GroupSelector
-                                selectedGroup={selectedGroup}
-                                onGroupSelect={handleGroupSelect}
-                                status={status}
-                                onExpandChange={setIsGroupSelectorExpanded}
-                            />
+                    {(attachments.length > 0 || uploadQueue.length > 0) && (
+                        <div className="flex flex-row gap-2 overflow-x-auto py-2 max-h-32 z-10 px-1">
+                            {attachments.map((attachment, index) => (
+                                <AttachmentPreview
+                                    key={attachment.url}
+                                    attachment={attachment}
+                                    onRemove={() => removeAttachment(index)}
+                                    isUploading={false}
+                                />
+                            ))}
+                            {uploadQueue.map((filename) => (
+                                <AttachmentPreview
+                                    key={filename}
+                                    attachment={{
+                                        url: "",
+                                        name: filename,
+                                        contentType: "",
+                                        size: 0,
+                                    } as Attachment}
+                                    onRemove={() => { }}
+                                    isUploading={true}
+                                />
+                            ))}
                         </div>
+                    )}
+
+                    <div className="relative rounded-lg bg-neutral-100 dark:bg-neutral-900">
+                        <Textarea
+                            ref={inputRef}
+                            placeholder={getPlaceholderText()}
+                            value={input}
+                            onChange={handleInput}
+                            disabled={isProcessing}
+                            onFocus={handleFocus}
+                            onBlur={handleBlur}
+                            className={cn(
+                                "min-h-[72px] w-full resize-none rounded-lg",
+                                "text-base leading-relaxed",
+                                "bg-neutral-100 dark:bg-neutral-900",
+                                "border !border-neutral-200 dark:!border-neutral-700",
+                                "focus:!border-neutral-300 dark:focus:!border-neutral-600",
+                                isFocused ? "!border-neutral-300 dark:!border-neutral-600" : "",
+                                "text-neutral-900 dark:text-neutral-100",
+                                "focus:!ring-1 focus:!ring-neutral-300 dark:focus:!ring-neutral-600",
+                                "px-4 py-4 pb-16",
+                                "overflow-y-auto",
+                                "touch-manipulation",
+                                direction === 'rtl' ? "text-right" : "text-left",
+                                language === 'ar' ? 'font-tajawal' : 'font-montserrat'
+                            )}
+                            style={{
+                                maxHeight: `${MAX_HEIGHT}px`,
+                                WebkitUserSelect: 'text',
+                                WebkitTouchCallout: 'none',
+                                direction: direction,
+                            }}
+                            rows={1}
+                            autoFocus={width ? width > 768 : true}
+                            onKeyDown={handleKeyDown}
+                            onPaste={handlePaste}
+                            dir={direction}
+                        />
+
+                        {/* Character counter with responsive positioning */}
+                        {input.length > 0 && (
+                            <div className="absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 z-10">
+                                <CharacterCounter current={input.length} max={MAX_INPUT_CHARS} />
+                            </div>
+                        )}
 
                         <div className={cn(
-                            "transition-all duration-300",
-                            (isMobile && isGroupSelectorExpanded) ? "opacity-0 w-0 invisible" : "opacity-100 visible w-auto"
+                            "absolute bottom-0 inset-x-0 flex justify-between items-center p-2 rounded-b-lg",
+                            "bg-neutral-100 dark:bg-neutral-900",
+                            "!border !border-t-0 !border-neutral-200 dark:!border-neutral-700",
+                            isFocused ? "!border-neutral-300 dark:!border-neutral-600" : "",
+                            isProcessing ? "!opacity-20 !cursor-not-allowed" : ""
                         )}>
-                            <ModelSwitcher
-                                selectedModel={selectedModel}
-                                setSelectedModel={setSelectedModel}
-                                showExperimentalModels={showExperimentalModels}
-                                attachments={attachments}
-                                messages={messages}
-                                status={status}
-                            />
-                        </div>
+                            <div className={cn(
+                                "flex items-center gap-2",
+                                isMobile && "overflow-hidden"
+                            )}>
+                                <div className={cn(
+                                    "transition-all duration-100",
+                                    (selectedGroup !== 'extreme')
+                                    ? "opacity-100 visible w-auto"
+                                    : "opacity-0 invisible w-0"
+                                )}>
+                                    <GroupSelector
+                                        selectedGroup={selectedGroup}
+                                        onGroupSelect={handleGroupSelect}
+                                        status={status}
+                                        onExpandChange={setIsGroupSelectorExpanded}
+                                    />
+                                </div>
 
-                        <div className={cn(
-                            "transition-all duration-300",
-                            (isMobile && isGroupSelectorExpanded)
-                                ? "opacity-0 invisible w-0"
-                                : "opacity-100 visible w-auto"
-                        )}>
-                            <button
-                                onClick={() => {
-                                    setSelectedGroup(selectedGroup === 'extreme' ? 'web' : 'extreme');
-                                    // Show toast notification on mobile devices
-                                    if (isMobile) {
-                                        const newMode = selectedGroup === 'extreme' ? 'Web Search' : 'Extreme Mode';
-                                        const description = selectedGroup === 'extreme' 
-                                            ? 'Standard web search mode'
-                                            : 'Enhanced deep research mode';
-                                        toast(`Switched to ${newMode}: ${description}`, {
-                                            duration: 2000,
-                                        });
-                                    }
-                                }}
-                                className={cn(
-                                    "flex items-center gap-2 p-2 sm:px-3 h-8",
-                                    "rounded-full transition-all duration-300",
-                                    "border border-neutral-200 dark:border-neutral-800",
-                                    "hover:shadow-md",
-                                    selectedGroup === 'extreme'
-                                        ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900"
-                                        : "bg-white dark:bg-neutral-900 text-neutral-500",
+                                <div className={cn(
+                                    "transition-all duration-300",
+                                    (isMobile && isGroupSelectorExpanded)
+                                        ? "opacity-0 invisible w-0"
+                                        : "opacity-100 visible w-auto"
+                                )}>
+                                    <ModelSwitcher
+                                        selectedModel={selectedModel}
+                                        setSelectedModel={setSelectedModel}
+                                        showExperimentalModels={showExperimentalModels}
+                                        attachments={attachments}
+                                        messages={messages}
+                                        status={status}
+                                    />
+                                </div>
+
+                                <div className={cn(
+                                    "transition-all duration-300",
+                                    (isMobile && isGroupSelectorExpanded)
+                                        ? "opacity-0 invisible w-0"
+                                        : "opacity-100 visible w-auto"
+                                )}>
+                                    <button
+                                        onClick={() => {
+                                            setSelectedGroup(selectedGroup === 'extreme' ? 'web' : 'extreme');
+                                            // Show toast notification on mobile devices
+                                            if (isMobile) {
+                                                const newMode = selectedGroup === 'extreme' 
+                                                    ? translate('البحث العادي', 'Web Search') 
+                                                    : translate('الوضع المتقدم', 'Extreme Mode');
+                                                const description = selectedGroup === 'extreme' 
+                                                    ? translate('وضع البحث العادي على الويب', 'Standard web search mode')
+                                                    : translate('وضع البحث المتقدم والعميق', 'Enhanced deep research mode');
+                                                toast.success(translate(
+                                                    `تم التبديل إلى ${newMode}: ${description}`,
+                                                    `Switched to ${newMode}: ${description}`
+                                                ));
+                                            }
+                                        }}
+                                        className={cn(
+                                            "flex items-center gap-2 p-2 sm:px-3 h-8",
+                                            "rounded-full transition-all duration-300",
+                                            "border border-neutral-200 dark:border-neutral-800",
+                                            "hover:shadow-md",
+                                            selectedGroup === 'extreme'
+                                                ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900"
+                                                : "bg-white dark:bg-neutral-900 text-neutral-500",
+                                        )}
+                                    >
+                                        <Mountain className="h-3.5 w-3.5" />
+                                        <span className="hidden sm:block text-xs font-medium">
+                                            {translate('متقدم', 'Extreme')}
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                {hasVisionSupport(selectedModel) && !(isMobile && isGroupSelectorExpanded) && (
+                                    <Button
+                                        className="rounded-full p-1.5 h-8 w-8 bg-white dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-600"
+                                        onClick={(event) => {
+                                            event.preventDefault();
+                                            triggerFileInput();
+                                        }}
+                                        variant="outline"
+                                        disabled={isProcessing}
+                                    >
+                                        <PaperclipIcon size={14} />
+                                    </Button>
                                 )}
-                            >
-                                <Mountain className="h-3.5 w-3.5" />
-                                <span className="hidden sm:block text-xs font-medium">Extreme</span>
-                            </button>
+
+                                {isProcessing ? (
+                                    <Button
+                                        className="rounded-full p-1.5 h-8 w-8"
+                                        onClick={(event) => {
+                                            event.preventDefault();
+                                            stop();
+                                        }}
+                                        variant="destructive"
+                                    >
+                                        <StopIcon size={14} />
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        className="rounded-full p-1.5 h-8 w-8"
+                                        onClick={(event) => {
+                                            event.preventDefault();
+                                            submitForm();
+                                        }}
+                                        disabled={input.length === 0 && attachments.length === 0 || uploadQueue.length > 0 || status !== 'ready'}
+                                    >
+                                        <ArrowUpIcon size={14} />
+                                    </Button>
+                                )}
+                            </div>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        {hasVisionSupport(selectedModel) && !(isMobile && isGroupSelectorExpanded) && (
-                            <Button
-                                className="rounded-full p-1.5 h-8 w-8 bg-white dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-600"
-                                onClick={(event) => {
-                                    event.preventDefault();
-                                    triggerFileInput();
-                                }}
-                                variant="outline"
-                                disabled={isProcessing}
-                            >
-                                <PaperclipIcon size={14} />
-                            </Button>
-                        )}
-
-                        {isProcessing ? (
-                            <Button
-                                className="rounded-full p-1.5 h-8 w-8"
-                                onClick={(event) => {
-                                    event.preventDefault();
-                                    stop();
-                                }}
-                                variant="destructive"
-                            >
-                                <StopIcon size={14} />
-                            </Button>
-                        ) : (
-                            <Button
-                                className="rounded-full p-1.5 h-8 w-8"
-                                onClick={(event) => {
-                                    event.preventDefault();
-                                    submitForm();
-                                }}
-                                disabled={input.length === 0 && attachments.length === 0 || uploadQueue.length > 0 || status !== 'ready'}
-                            >
-                                <ArrowUpIcon size={14} />
-                            </Button>
-                        )}
-                    </div>
+                    <SuggestedQuestions
+                        selectedGroup={selectedGroup}
+                        onQuestionClick={handleQuestionClick}
+                        clearSuggestions={() => setShowSuggestions(false)}
+                        showSuggestions={showSuggestions && !isProcessing && messages.length === 0}
+                    />
                 </div>
-            </div>
+            </form>
         </div>
     );
 };

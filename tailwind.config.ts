@@ -24,7 +24,9 @@ const config = {
         'screen-small': '100svh',
       },
       fontFamily: {
-        sans: ['var(--font-geist-sans)', ...fontFamily.sans],
+        sans: ['var(--font-geist-sans)', 'var(--font-tajawal)', 'var(--font-montserrat)', ...fontFamily.sans],
+        tajawal: ['var(--font-tajawal)'],
+        montserrat: ['var(--font-montserrat)'],
         syne: ['var(--font-syne)'],
         mono: ['var(--font-geist-mono)', ...fontFamily.mono],
       },
