@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { createClientComponent } from '@/lib/supabase';
+import { getSupabaseClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
@@ -20,7 +20,7 @@ interface SignUpData {
 export function useAuth() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const supabase = createClientComponent();
+  const supabase = getSupabaseClient();
   const router = useRouter();
 
   // Get session and user on mount

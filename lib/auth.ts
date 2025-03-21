@@ -1,16 +1,11 @@
-import { createClient } from "@supabase/supabase-js";
-
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import { getSupabaseClient } from "./supabase";
 
 /**
  * Sign in with email and password
  */
 export async function signIn(email: string, password: string) {
   try {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -32,6 +27,7 @@ export async function signIn(email: string, password: string) {
  */
 export async function signUp(email: string, password: string, name: string) {
   try {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -58,6 +54,7 @@ export async function signUp(email: string, password: string, name: string) {
  */
 export async function signOut() {
   try {
+    const supabase = getSupabaseClient();
     const { error } = await supabase.auth.signOut();
     if (error) {
       console.error('Error signing out:', error);
@@ -75,6 +72,7 @@ export async function signOut() {
  */
 export async function getCurrentUser() {
   try {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase.auth.getUser();
     
     if (error) {
@@ -94,6 +92,7 @@ export async function getCurrentUser() {
  */
 export async function resetPassword(email: string) {
   try {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     });
@@ -114,6 +113,7 @@ export async function resetPassword(email: string) {
  */
 export async function updateProfile(profile: { name?: string; avatar_url?: string }) {
   try {
+    const supabase = getSupabaseClient();
     const { data: userData, error: userError } = await supabase.auth.getUser();
     
     if (userError) {
@@ -140,6 +140,7 @@ export async function updateProfile(profile: { name?: string; avatar_url?: strin
  */
 export async function isAuthenticated() {
   try {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase.auth.getSession();
     
     if (error) {

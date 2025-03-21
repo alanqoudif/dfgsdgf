@@ -1,0 +1,140 @@
+{
+  "undergraduate": {
+    "foundation": {
+      "description": "البرنامج التأسيسي",
+      "fees_per_year": 2300,
+      "currency": "OMR",
+      "duration": "1 year",
+      "notes": "يشمل مهارات اللغة الإنجليزية والرياضيات وتقنية المعلومات"
+    },
+    "business": {
+      "description": "كلية إدارة الأعمال",
+      "fees_per_year": 2800,
+      "total_cost": 11200,
+      "currency": "OMR",
+      "duration": "4 years",
+      "credits": 120,
+      "notes": "تشمل التخصصات: المحاسبة، التسويق، نظم المعلومات الإدارية"
+    },
+    "engineering": {
+      "description": "كلية الهندسة",
+      "fees_per_year": 3200,
+      "total_cost": 12800,
+      "currency": "OMR",
+      "duration": "4 years",
+      "credits": 120,
+      "notes": "تشمل الهندسة الكيميائية، المدنية، الكهربائية، الميكانيكية"
+    },
+    "computing": {
+      "description": "كلية الحوسبة وتقنية المعلومات",
+      "fees_per_year": 2900,
+      "total_cost": 11600,
+      "currency": "OMR",
+      "duration": "4 years",
+      "credits": 120,
+      "notes": "تشمل علوم الحاسوب، نظم المعلومات، شبكات الحاسوب"
+    },
+    "education": {
+      "description": "كلية التربية والآداب",
+      "fees_per_year": 2600,
+      "total_cost": 10400,
+      "currency": "OMR",
+      "duration": "4 years",
+      "credits": 120,
+      "notes": "تشمل اللغة الإنجليزية، الترجمة، العلوم التربوية"
+    },
+    "law": {
+      "description": "كلية القانون",
+      "fees_per_year": 2700,
+      "total_cost": 10800,
+      "currency": "OMR",
+      "duration": "4 years",
+      "credits": 120,
+      "notes": "تشمل القانون الجنائي، المدني، التجاري، الدولي"
+    }
+  },
+  "postgraduate": {
+    "mba": {
+      "description": "ماجستير إدارة الأعمال",
+      "fees_total": 4200,
+      "currency": "OMR",
+      "duration": "2 years (part-time)",
+      "credits": 60,
+      "notes": "دوام جزئي متاح، تشمل الإدارة العامة، المالية، التسويق"
+    },
+    "msc_engineering": {
+      "description": "ماجستير العلوم في الهندسة",
+      "fees_total": 4500,
+      "currency": "OMR",
+      "duration": "2 years",
+      "credits": 60,
+      "notes": "تشمل الهندسة الكيميائية، الكهربائية، الميكانيكية"
+    },
+    "msc_it": {
+      "description": "ماجستير العلوم في تكنولوجيا المعلومات",
+      "fees_total": 4300,
+      "currency": "OMR",
+      "duration": "2 years",
+      "credits": 60,
+      "notes": "تشمل أمن المعلومات، تطوير البرمجيات، علوم البيانات"
+    },
+    "med": {
+      "description": "ماجستير التربية",
+      "fees_total": 4000,
+      "currency": "OMR",
+      "duration": "2 years",
+      "credits": 60,
+      "notes": "تشمل المناهج وطرق التدريس، الإدارة التربوية"
+    }
+  },
+  "additional_fees": {
+    "registration": {
+      "description": "رسوم التسجيل (مرة واحدة)",
+      "amount": 80,
+      "currency": "OMR"
+    },
+    "student_services": {
+      "description": "رسوم الخدمات الطلابية (سنوية)",
+      "amount": 40,
+      "currency": "OMR"
+    },
+    "graduation": {
+      "description": "رسوم التخرج",
+      "amount": 70,
+      "currency": "OMR"
+    }
+  },
+  "scholarships": {
+    "academic_merit": {
+      "description": "منحة التفوق الأكاديمي",
+      "discount": "20-50%",
+      "eligibility": "الطلبة الحاصلين على معدل 90% وأعلى في الثانوية العامة"
+    },
+    "siblings": {
+      "description": "منحة الأشقاء",
+      "discount": "10%",
+      "eligibility": "للطلبة الذين لديهم إخوة يدرسون في الجامعة"
+    },
+    "financial_aid": {
+      "description": "المساعدات المالية",
+      "discount": "15-30%",
+      "eligibility": "بناءً على دراسة الحالة الاقتصادية للطالب"
+    }
+  },
+  "payment_plans": {
+    "options": [
+      {
+        "description": "دفعة واحدة",
+        "details": "دفع كامل الرسوم الدراسية في بداية العام الدراسي (خصم 3%)"
+      },
+      {
+        "description": "دفعتين",
+        "details": "دفع الرسوم على دفعتين في بداية كل فصل دراسي"
+      },
+      {
+        "description": "أقساط شهرية",
+        "details": "تقسيط الرسوم على أقساط شهرية (مع رسوم إدارية 2%)"
+      }
+    ]
+  }
+} 

@@ -25,34 +25,37 @@ export default function RegisterPage() {
     e.preventDefault();
     
     if (!email || !password || !confirmPassword || !name) {
-      toast.error({
+      toast({
         title: translate('خطأ', 'Error'),
         description: translate(
           'يرجى إكمال جميع الحقول المطلوبة',
           'Please complete all required fields'
         ),
+        variant: 'destructive',
       });
       return;
     }
     
     if (password !== confirmPassword) {
-      toast.error({
+      toast({
         title: translate('خطأ', 'Error'),
         description: translate(
           'كلمات المرور غير متطابقة',
           'Passwords do not match'
         ),
+        variant: 'destructive',
       });
       return;
     }
     
     if (password.length < 6) {
-      toast.error({
+      toast({
         title: translate('خطأ', 'Error'),
         description: translate(
           'يجب أن تتكون كلمة المرور من 6 أحرف على الأقل',
           'Password must be at least 6 characters long'
         ),
+        variant: 'destructive',
       });
       return;
     }
@@ -63,12 +66,13 @@ export default function RegisterPage() {
       const { user, error } = await signUp(email, password, name);
       
       if (error) {
-        toast.error({
+        toast({
           title: translate('فشل التسجيل', 'Registration Failed'),
           description: error.message,
+          variant: 'destructive',
         });
       } else if (user) {
-        toast.success({
+        toast({
           title: translate('تم التسجيل بنجاح', 'Registration Successful'),
           description: translate(
             'تم إنشاء حسابك بنجاح!',
@@ -76,15 +80,16 @@ export default function RegisterPage() {
           ),
         });
         router.push('/');
+        router.refresh();
       }
     } catch (error) {
-      console.error('Error during registration:', error);
-      toast.error({
+      toast({
         title: translate('خطأ', 'Error'),
         description: translate(
-          'حدث خطأ أثناء التسجيل، يرجى المحاولة مرة أخرى',
-          'An error occurred during registration, please try again'
+          'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى',
+          'An unexpected error occurred. Please try again'
         ),
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);

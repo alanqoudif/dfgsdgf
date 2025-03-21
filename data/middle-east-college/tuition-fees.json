@@ -1,0 +1,103 @@
+{
+  "undergraduate": {
+    "foundation": {
+      "description": "التحضيري للبكالوريوس",
+      "fees_per_year": 2500,
+      "currency": "OMR",
+      "duration": "1 year",
+      "notes": "الرسوم تشمل المصادر التعليمية"
+    },
+    "computer_science": {
+      "description": "بكالوريوس علوم الحاسوب",
+      "fees_per_year": 3200,
+      "total_cost": 12800,
+      "currency": "OMR",
+      "duration": "4 years",
+      "credits": 120,
+      "notes": "يمكن أن تختلف الرسوم حسب التخصص الدقيق"
+    },
+    "engineering": {
+      "description": "بكالوريوس الهندسة",
+      "fees_per_year": 3500,
+      "total_cost": 14000,
+      "currency": "OMR",
+      "duration": "4 years",
+      "credits": 120,
+      "notes": "تشمل التخصصات الهندسة المدنية، الميكانيكية، والكهربائية"
+    },
+    "business": {
+      "description": "بكالوريوس إدارة الأعمال",
+      "fees_per_year": 3000,
+      "total_cost": 12000,
+      "currency": "OMR",
+      "duration": "4 years",
+      "credits": 120,
+      "notes": "يشمل تخصصات المحاسبة، التسويق، وإدارة الموارد البشرية"
+    }
+  },
+  "postgraduate": {
+    "mba": {
+      "description": "ماجستير إدارة الأعمال",
+      "fees_total": 4500,
+      "currency": "OMR",
+      "duration": "2 years (part-time)",
+      "credits": 60,
+      "notes": "متوفر بخيار الدوام الجزئي والكامل"
+    },
+    "msc_engineering": {
+      "description": "ماجستير العلوم في الهندسة",
+      "fees_total": 4800,
+      "currency": "OMR",
+      "duration": "2 years",
+      "credits": 60,
+      "notes": "يتطلب مشروع تخرج أو أطروحة"
+    },
+    "msc_it": {
+      "description": "ماجستير العلوم في تكنولوجيا المعلومات",
+      "fees_total": 4600,
+      "currency": "OMR",
+      "duration": "2 years",
+      "credits": 60,
+      "notes": "يشمل تخصصات أمن المعلومات وعلوم البيانات"
+    }
+  },
+  "additional_fees": {
+    "registration": {
+      "description": "رسوم التسجيل (مرة واحدة)",
+      "amount": 100,
+      "currency": "OMR"
+    },
+    "student_activities": {
+      "description": "رسوم الأنشطة الطلابية (سنوية)",
+      "amount": 50,
+      "currency": "OMR"
+    },
+    "graduation": {
+      "description": "رسوم التخرج",
+      "amount": 80,
+      "currency": "OMR"
+    }
+  },
+  "scholarships": {
+    "academic_excellence": {
+      "description": "منحة التفوق الأكاديمي",
+      "discount": "15-50%",
+      "eligibility": "الطلبة الحاصلين على معدل 85% وأعلى في الثانوية العامة"
+    },
+    "financial_need": {
+      "description": "منحة الحاجة المالية",
+      "discount": "10-30%",
+      "eligibility": "بناءً على دراسة الحالة الاقتصادية للطالب"
+    }
+  },
+  "payment_plans": {
+    "installments": {
+      "description": "نظام الأقساط",
+      "options": [
+        "قسط واحد (خصم 5%)",
+        "قسطين (في بداية كل فصل دراسي)",
+        "أقساط شهرية (بإضافة رسوم إدارية 2%)"
+      ]
+    }
+  }
+} 

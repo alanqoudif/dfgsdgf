@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Menu, MessageSquare } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetTrigger, SheetContent } from '@/components/ui/sheet';
@@ -10,21 +10,10 @@ import { ModeToggle } from '@/components/mode-toggle';
 import { LanguageToggle } from '@/components/language-toggle';
 import { useLanguage } from '@/app/language-context';
 import { UserButton } from '@/components/UserButton';
-import { useQuestionLimit } from '@/hooks/useQuestionLimit';
-import { Badge } from '@/components/ui/badge';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { useAuth } from '@/hooks/useAuth';
 
 export function Navbar() {
   const pathname = usePathname();
   const { translate } = useLanguage();
-  const { questionsLeft, isAnonymous, isLoading } = useQuestionLimit();
-  const { user } = useAuth();
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -91,72 +80,6 @@ export function Navbar() {
             <CommandMenu />
           </div>
           <div className="flex items-center">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="relative mr-2 gap-2 text-sm h-8 px-2 border-neutral-300 dark:border-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                  >
-                    <MessageSquare className="h-4 w-4 text-blue-500" />
-                    {!isLoading && questionsLeft !== null && (
-                      <span className="font-medium">
-                        {questionsLeft} 
-                      </span>
-                    )}
-                    {!isLoading && questionsLeft === null && (
-                      <span className="font-medium">
-                        ∞
-                      </span>
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent className="w-64">
-                  <div className="p-2">
-                    <h4 className="font-bold text-sm mb-1">
-                      {translate('رصيد الرسائل:', 'Message Balance:')} {questionsLeft !== null ? questionsLeft : '∞'}
-                    </h4>
-                    {questionsLeft !== null && (
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {translate(
-                          isAnonymous 
-                            ? 'الحد الأقصى للزوار: 3 رسائل'
-                            : 'الحد الأقصى للمستخدمين: 25 رسالة',
-                          isAnonymous
-                            ? 'Guest limit: 3 messages'
-                            : 'User limit: 25 messages'
-                        )}
-                      </p>
-                    )}
-                    {isAnonymous && (
-                      <div className="mt-3 pt-2 border-t flex flex-col gap-2">
-                        <p className="text-xs font-medium">
-                          {translate(
-                            'قم بتسجيل الدخول للحصول على المزيد من الرسائل',
-                            'Sign in to get more messages'
-                          )}
-                        </p>
-                        <div className="flex gap-2">
-                          <Link 
-                            href="/login" 
-                            className="text-xs flex-1 text-center px-2 py-1.5 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-                          >
-                            {translate('تسجيل الدخول', 'Sign In')}
-                          </Link>
-                          <Link 
-                            href="/register" 
-                            className="text-xs flex-1 text-center px-2 py-1.5 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
-                          >
-                            {translate('إنشاء حساب', 'Sign Up')}
-                          </Link>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
             <LanguageToggle />
             <ModeToggle />
             <UserButton />

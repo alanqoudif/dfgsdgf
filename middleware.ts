@@ -2,6 +2,10 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+/**
+ * Middleware function to handle authentication and redirection
+ * This is server-side code and needs its own Supabase client instance
+ */
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({
     request: {
@@ -9,6 +13,8 @@ export async function middleware(request: NextRequest) {
     },
   });
 
+  // This is a special server-side client that needs to be created this way
+  // We can't use our singleton pattern here because this runs in middleware
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

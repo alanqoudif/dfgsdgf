@@ -1,23 +1,122 @@
-'use client';
-
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Determine if we're on the client side
+const isClient = typeof window !== 'undefined';
 
-// Function to create a client component instance
-export const createClientComponent = () => {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+// Create a single client instance for server-side
+const serverSideClient = createClient(supabaseUrl, supabaseAnonKey);
+
+// For client-side, we'll create a single instance and reuse it
+let browserClient: ReturnType<typeof createClient> | null = null;
+
+/**
+ * Get the Supabase client - single instance pattern
+ * This is the PREFERRED way to get the Supabase client throughout the app
+ */
+export function getSupabaseClient() {
+  if (!isClient) {
+    // On server side, always return the server-side client
+    return serverSideClient;
+  }
+  
+  // On client side, create the client once and reuse it
+  if (!browserClient) {
+    browserClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        storage: window.localStorage,
+      },
+    });
+  }
+  
+  return browserClient;
+}
+
+// Legacy export for backward compatibility - DEPRECATED, use getSupabaseClient() instead
+export const supabase = serverSideClient;
+
+// Legacy function for backward compatibility - DEPRECATED, use getSupabaseClient() instead
+export function createClientComponent() {
+  console.warn(
+    'DEPRECATED: createClientComponent() is deprecated and will be removed in a future version. ' +
+    'Use getSupabaseClient() instead.'
   );
+  return getSupabaseClient();
+}
+
+// Define types for database tables
+export type User = {
+  id: string;
+  name: string;
+  email: string;
+  avatar_url?: string;
+  questions_count: number;
+  is_paid_user: boolean;
+  last_questions_reset: string;
+  created_at: string;
+  updated_at: string;
 };
 
-// Free tier limit for questions
-export const FREE_TIER_QUESTIONS_LIMIT = 25;
+export type Question = {
+  id: string;
+  user_id: string;
+  question: string;
+  answer?: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type UploadedFile = {
+  name: string;
+  url: string;
+  size: number;
+  created_at: string;
+};
+
+/**
+ * Get uploaded files for AI reference
+ */
+export async function getUploadedFiles() {
+  try {
+    const client = getSupabaseClient();
+    const { data, error } = await client.storage
+      .from('aidata')
+      .list();
+
+    if (error) {
+      console.error('Error fetching uploaded files:', error);
+      return [];
+    }
+
+    // Get public URLs for all files
+    const filesWithUrls = await Promise.all(
+      (data || []).map(async (file) => {
+        const { data: urlData } = client.storage
+          .from('aidata')
+          .getPublicUrl(file.name);
+
+        return {
+          name: file.name,
+          url: urlData.publicUrl,
+          size: file.metadata?.size || 0,
+          created_at: file.created_at || new Date().toISOString()
+        };
+      })
+    );
+
+    return filesWithUrls;
+  } catch (error) {
+    console.error('Error in getUploadedFiles:', error);
+    return [];
+  }
+}
+
+// Free tier limit for questions per day
+const FREE_TIER_DAILY_LIMIT = 20;
 
 /**
  * Save a question and its answer to the database
@@ -32,8 +131,9 @@ export async function saveQuestion({
   answer: string;
 }) {
   try {
+    const client = getSupabaseClient();
     // Insert the question into the questions table
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from('questions')
       .insert([
         {
@@ -50,9 +150,9 @@ export async function saveQuestion({
     }
 
     // Increment the user's question count
-    const { error: updateError } = await supabase
-      .from('profiles')
-      .update({ questions_count: supabase.rpc('increment_count', { row_id: userId }) })
+    const { error: updateError } = await client
+      .from('users')
+      .update({ question_count: client.rpc('increment_count', { row_id: userId }) })
       .eq('id', userId);
 
     if (updateError) {
@@ -72,46 +172,47 @@ export async function saveQuestion({
  */
 export async function checkUserLimit(userId: string) {
   try {
-    // Get user data to check if they are on the paid tier
-    const { data: userData, error: userError } = await supabase
-      .from('profiles')
-      .select('questions_count, is_paid_user, last_questions_reset')
+    const client = getSupabaseClient();
+    // Get user data to check if they are on the premium tier
+    const { data: userData, error: userError } = await client
+      .from('users')
+      .select('is_premium')
       .eq('id', userId)
       .single();
 
     if (userError) {
       console.error('Error fetching user data:', userError);
-      return { hasReachedLimit: false, error: userError, questionsLeft: FREE_TIER_QUESTIONS_LIMIT, daysToReset: null };
+      return { hasReachedLimit: false, error: userError };
     }
 
     // Premium users have no limit
-    if (userData.is_paid_user) {
-      return { hasReachedLimit: false, error: null, questionsLeft: null, daysToReset: null };
+    if (userData.is_premium) {
+      return { hasReachedLimit: false, error: null };
     }
 
-    // Calculate time until reset (3 days from last reset)
-    let daysToReset = null;
-    if (userData.last_questions_reset) {
-      const resetDate = new Date(userData.last_questions_reset);
-      resetDate.setDate(resetDate.getDate() + 3); // Reset after 3 days
-      const now = new Date();
-      const timeDiff = resetDate.getTime() - now.getTime();
-      daysToReset = Math.max(0, Math.ceil(timeDiff / (1000 * 3600 * 24)));
+    // For free tier users, count questions asked in the last 24 hours
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const { count, error: countError } = await client
+      .from('questions')
+      .select('id', { count: 'exact' })
+      .eq('user_id', userId)
+      .gte('created_at', yesterday.toISOString());
+
+    if (countError) {
+      console.error('Error counting questions:', countError);
+      return { hasReachedLimit: false, error: countError };
     }
 
-    // For free tier users, check questions_count
-    const questionsLeft = Math.max(0, FREE_TIER_QUESTIONS_LIMIT - (userData.questions_count || 0));
-    
     // Check if the user has reached the limit
     return {
-      hasReachedLimit: questionsLeft <= 0,
-      questionsLeft: questionsLeft,
-      daysToReset: daysToReset,
+      hasReachedLimit: count !== null && count >= FREE_TIER_DAILY_LIMIT,
       error: null,
     };
   } catch (error) {
     console.error('Error in checkUserLimit:', error);
-    return { hasReachedLimit: false, error, questionsLeft: FREE_TIER_QUESTIONS_LIMIT, daysToReset: null };
+    return { hasReachedLimit: false, error };
   }
 }
 
@@ -120,7 +221,8 @@ export async function checkUserLimit(userId: string) {
  */
 export async function getUserQuestions(userId: string) {
   try {
-    const { data, error } = await supabase
+    const client = getSupabaseClient();
+    const { data, error } = await client
       .from('questions')
       .select('*')
       .eq('user_id', userId)
@@ -143,7 +245,8 @@ export async function getUserQuestions(userId: string) {
  */
 export async function getQuestionById(questionId: string) {
   try {
-    const { data, error } = await supabase
+    const client = getSupabaseClient();
+    const { data, error } = await client
       .from('questions')
       .select('*')
       .eq('id', questionId)
@@ -166,8 +269,9 @@ export async function getQuestionById(questionId: string) {
  */
 export async function deleteQuestion(questionId: string, userId: string) {
   try {
+    const client = getSupabaseClient();
     // First verify the question belongs to the user
-    const { data: questionData, error: questionError } = await supabase
+    const { data: questionData, error: questionError } = await client
       .from('questions')
       .select('user_id')
       .eq('id', questionId)
@@ -186,7 +290,7 @@ export async function deleteQuestion(questionId: string, userId: string) {
     }
 
     // Delete the question
-    const { error } = await supabase
+    const { error } = await client
       .from('questions')
       .delete()
       .eq('id', questionId);
@@ -204,49 +308,45 @@ export async function deleteQuestion(questionId: string, userId: string) {
 }
 
 /**
- * Reset a user's question count (for testing purposes or manual reset)
+ * Create the aidata bucket if it doesn't exist
  */
-export async function resetUserQuestionCount(userId: string) {
+export async function createAIDataBucketIfNotExists() {
   try {
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        questions_count: 0,
-        last_questions_reset: new Date().toISOString()
-      })
-      .eq('id', userId);
-
-    if (error) {
-      console.error('Error resetting question count:', error);
-      return { success: false, error };
+    const client = getSupabaseClient();
+    // Check if bucket exists
+    const { data: buckets, error: listError } = await client
+      .storage
+      .getBuckets();
+    
+    const bucketExists = buckets?.some(bucket => bucket.name === 'aidata');
+    
+    if (!bucketExists) {
+      // Create new bucket for AI data
+      const { data, error } = await client
+        .storage
+        .createBucket('aidata', {
+          public: false, // Default to private
+          fileSizeLimit: 10485760, // 10MB limit
+        });
+      
+      if (error) throw error;
+      
+      // Update bucket to be public
+      const { error: updateError } = await client
+        .storage
+        .updateBucket('aidata', {
+          public: true,
+          fileSizeLimit: 10485760, // 10MB limit
+        });
+      
+      if (updateError) throw updateError;
+      
+      console.log('Created aidata bucket for file uploads');
     }
-
+    
     return { success: true };
   } catch (error) {
-    console.error('Error in resetUserQuestionCount:', error);
+    console.error('Error creating aidata bucket:', error);
     return { success: false, error };
-  }
-}
-
-/**
- * Get the user's profile information
- */
-export async function getUserProfile(userId: string) {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-
-    if (error) {
-      console.error('Error fetching user profile:', error);
-      return null;
-    }
-
-    return data;
-  } catch (error) {
-    console.error('Error in getUserProfile:', error);
-    return null;
   }
 } 

@@ -24,14 +24,19 @@ import Exa from 'exa-js';
 import { z } from 'zod';
 import { geolocation } from '@vercel/functions';
 import MemoryClient from 'mem0ai';
-import { type NextRequest } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { LangChainStream } from 'ai';
 import { ChatOpenAI } from '@langchain/openai';
-import { checkUserLimit, saveQuestion } from '@/lib/supabase';
+import { checkUserLimit, saveQuestion, getUploadedFiles } from '@/lib/supabase';
 import { getCurrentUser } from '@/lib/auth';
 import { TEMPLATE } from '@/lib/constants';
 import { getSearchGroupPrompt } from '@/app/actions';
+import { OpenAIStream, StreamingTextResponse } from 'ai';
+import { Configuration, OpenAIApi } from 'openai-edge';
+import { getCollegeDataForAI, searchCollegeData } from '@/lib/collegeData';
+import { OpenAI } from 'openai';
+import { getSupabaseClient } from '@/lib/supabase';
 
 const scira = customProvider({
     languageModels: {
@@ -180,105 +185,103 @@ const schema = z.object({
   selectedTemplate: z.string().optional(),
 });
 
-export async function POST(req: NextRequest) {
+// Create a simple streaming response function since LangChainStream might not be available
+const createStreamingResponse = (
+  stream: ReadableStream
+) => {
+  return new Response(stream);
+};
+
+// Mock function for getGroupConfig since it's missing
+const getGroupConfigMock = (groupId = 'web') => {
+  return {
+    tools: [],
+    systemPrompt: '',
+    toolInstructions: '',
+    responseGuidelines: ''
+  };
+};
+
+export async function POST(request: NextRequest) {
   try {
-    const body = await req.json();
-    const { prompt, messages, selectedTemplate } = schema.parse(body);
+    const supabase = getSupabaseClient();
+    const { data: { session } } = await supabase.auth.getSession();
 
-    // Get the current user
-    const user = await getCurrentUser();
-    const userId = user?.id;
-    
-    // Check if user has reached their limit
-    if (!userId) {
-      // For anonymous users, check if they've reached the limit (store in session)
-      const { cookies } = req;
-      const anonQuestionCount = parseInt(cookies.get('anonQuestionCount')?.value || '0');
-      
-      if (anonQuestionCount >= 3) {
-        return new Response(
-          JSON.stringify({
-            error: 'Limit reached',
-            message: 'You have reached your question limit. Please sign in to continue.',
-          }),
-          { status: 403 }
-        );
-      }
-      
-      // Increment anonymous question count in cookie
-      cookies.set('anonQuestionCount', (anonQuestionCount + 1).toString());
-                                    } else {
-      // For logged-in users, check their limit in the database
-      const { hasReachedLimit, error } = await checkUserLimit(userId);
-      
-      if (error) {
-        console.error('Error checking user limit:', error);
-      }
-      
-      if (hasReachedLimit) {
-        return new Response(
-          JSON.stringify({
-            error: 'Limit reached',
-            message: 'You have reached your question limit. Please subscribe to our premium plan to continue.',
-          }),
-          { status: 403 }
-        );
-      }
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Setup the language model
-    const { stream, handlers } = LangChainStream();
+    const body = await request.json();
+    
+    if (!body || !body.messages || !Array.isArray(body.messages) || body.messages.length === 0) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
 
-    const llm = new ChatOpenAI({
-      modelName: 'gpt-4-turbo-preview',
-      streaming: true,
-      temperature: 0.7,
+    const { messages, model = 'gpt-4o' } = body;
+    
+    // Get the last message from the user to check if it's related to colleges
+    const lastMessage = messages[messages.length - 1].content;
+    
+    // Check if the last message is related to colleges
+    const isCollegeRelated = isMessageCollegeRelated(lastMessage);
+    
+    // Prepare system message with appropriate context
+    let systemPrompt = 'أنت مساعد ذكي يقدم إجابات مفيدة ودقيقة وقصيرة.';
+    
+    // If college-related, search for relevant college data and add to the context
+    if (isCollegeRelated) {
+      const collegeData = await searchCollegeData(lastMessage);
+      if (collegeData && collegeData.length > 0) {
+        systemPrompt = `أنت مساعد ذكي متخصص في المعلومات الجامعية في سلطنة عمان. 
+استخدم المعلومات التالية للإجابة على أسئلة المستخدم بشكل دقيق ومفيد:
+
+${collegeData.join('\n\n')}
+
+إذا كان السؤال لا يتعلق بالمعلومات المقدمة، أخبر المستخدم بأنك لا تملك معلومات كافية وأنه يمكنه التواصل مباشرة مع الجامعة للحصول على معلومات أكثر تفصيلاً.
+إذا لم يكن سؤال المستخدم متعلقًا بالجامعات أو الكليات، فقدم إجابة عامة ومفيدة.`;
+      }
+    }
+    
+    // Set up OpenAI client
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY || ''
     });
-
-    let systemPrompt = TEMPLATE;
     
-    if (selectedTemplate) {
-      systemPrompt = await getSearchGroupPrompt(selectedTemplate as any) || TEMPLATE;
-    }
-
-    const langchainMessages = [
-      new SystemMessage(systemPrompt),
-      ...((messages ?? [])
-        .filter((message) => message.role === 'user' || message.role === 'assistant')
-        .map((message) => {
-          if (message.role === 'user') {
-            return new HumanMessage(message.content);
-                                                    } else {
-            return new AIMessage(message.content);
-          }
-        })),
-      new HumanMessage(prompt),
+    // Prepare messages for OpenAI
+    const messagesToSend = [
+      { role: 'system', content: systemPrompt },
+      ...messages
     ];
-
-    // Make call to language model
-    const response = await llm.call(langchainMessages, {}, [handlers]).catch(console.error);
     
-    // After processing the request successfully, save the question and answer to the database
-    if (userId && response) {
-      try {
-        await saveQuestion({
-          userId,
-          question: prompt,
-          answer: response.content,
-        });
-      } catch (saveError) {
-        console.error('Error saving question:', saveError);
-      }
-    }
-
-    return new Response(stream);
-                            } catch (error) {
-    console.error('[LLM ERROR]', error);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json',
-      },
+    // Generate streaming response
+    const response = await openai.chat.completions.create({
+      model,
+      messages: messagesToSend,
+      stream: true
     });
+    
+    // Return streaming response
+    return new StreamingTextResponse(response.toReadableStream());
+    
+  } catch (error: any) {
+    console.error('Error processing chat request:', error);
+    return NextResponse.json(
+      { error: error.message || 'An error occurred during chat' },
+      { status: 500 }
+    );
   }
+}
+
+// Helper function to check if a message is related to colleges
+function isMessageCollegeRelated(message: string): boolean {
+  const collegeKeywords = [
+    'كلية', 'جامعة', 'الشرق الأوسط', 'صحار', 'رسوم', 'تسجيل', 'تخصص', 'قبول',
+    'منح', 'طلاب', 'دراسة', 'تعليم', 'دراسي', 'college', 'university', 'middle east',
+    'sohar', 'fees', 'tuition', 'admission', 'scholarship', 'student', 'education'
+  ];
+  
+  const messageLower = message.toLowerCase();
+  return collegeKeywords.some(keyword => 
+    messageLower.includes(keyword.toLowerCase())
+  );
 }

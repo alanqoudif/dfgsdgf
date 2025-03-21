@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 // /components/ui/form-component.tsx
-import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChatRequestOptions, CreateMessage, Message } from 'ai';
 import { toast } from 'sonner';
@@ -23,9 +23,6 @@ import { Mountain } from "lucide-react"
 import { UIMessage } from '@ai-sdk/ui-utils';
 import { useLanguage } from '@/app/language-context';
 import SuggestedQuestions from './suggested-questions';
-import { useQuestionLimit } from '@/hooks/useQuestionLimit';
-import { QuestionLimitWarning } from '@/components/QuestionLimitWarning';
-import { useAuth } from '@/hooks/useAuth';
 
 interface ModelSwitcherProps {
     selectedModel: string;
@@ -751,17 +748,6 @@ const FormComponent: React.FC<FormComponentProps> = ({
     const [isExceedingLimit, setIsExceedingLimit] = useState(false);
     const [showSuggestions, setShowSuggestions] = useState(true);
 
-    // Use the question limit hook
-    const { 
-        questionsLeft, 
-        daysToReset, 
-        hasReachedLimit, 
-        isAnonymous, 
-        handleQuestionSubmit 
-    } = useQuestionLimit();
-
-    const { user } = useAuth();
-
     // Get placeholder text based on current language
     const getPlaceholderText = () => {
         return translate("اسأل أي شيء...", "Ask anything...");
@@ -1048,24 +1034,18 @@ const FormComponent: React.FC<FormComponentProps> = ({
         }
 
         if (input.trim() || attachments.length > 0) {
-            // Check question limit before proceeding
-            handleQuestionSubmit().then(({ canProceed }) => {
-                if (canProceed) {
-                    setHasSubmitted(true);
-                    lastSubmittedQueryRef.current = input.trim();
-    
-                    // Use our own submit handler with error handling
-                    submitWithErrorHandling(event);
-                }
-                // If canProceed is false, the hook will have already shown an error toast
-            });
+            setHasSubmitted(true);
+            lastSubmittedQueryRef.current = input.trim();
+
+            // Use our own submit handler with error handling
+            submitWithErrorHandling(event);
         } else {
             toast.error(translate(
                 "يرجى إدخال استعلام بحث أو إرفاق صورة.",
                 "Please enter a search query or attach an image."
             ));
         }
-    }, [input, attachments, setHasSubmitted, lastSubmittedQueryRef, status, translate, handleQuestionSubmit]);
+    }, [input, attachments, setHasSubmitted, lastSubmittedQueryRef, status, translate]);
 
     // New function to handle errors in submission
     const submitWithErrorHandling = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -1169,251 +1149,245 @@ const FormComponent: React.FC<FormComponentProps> = ({
     }, [messages.length]);
 
     return (
-        <div className="w-full mx-auto">
-            <form onSubmit={onSubmit} className="relative w-full">
-                <div
-                    className={cn(
-                        "relative w-full flex flex-col gap-2 rounded-lg transition-all duration-300 !font-sans",
-                        hasInteracted ? "z-[51]" : "",
-                        isDragging && "ring-1 ring-neutral-300 dark:ring-neutral-700",
-                        attachments.length > 0 || uploadQueue.length > 0
-                            ? "bg-gray-100/70 dark:bg-neutral-800 p-1"
-                            : "bg-transparent"
-                    )}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                >
-                    <AnimatePresence>
-                        {isDragging && (
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="absolute inset-0 backdrop-blur-[2px] bg-background/80 dark:bg-neutral-900/80 rounded-lg border border-dashed border-neutral-300 dark:border-neutral-700 flex items-center justify-center z-50 m-2"
-                            >
-                                <div className="flex items-center gap-4 px-6 py-8">
-                                    <div className="p-3 rounded-full bg-neutral-100 dark:bg-neutral-800 shadow-sm">
-                                        <Upload className="h-6 w-6 text-neutral-600 dark:text-neutral-400" />
-                                    </div>
-                                    <div className="space-y-1 text-center">
-                                        <p className="text-sm font-medium text-neutral-600 dark:text-neutral-400">
-                                            {translate("أسقط الصور هنا", "Drop images here")}
-                                        </p>
-                                        <p className="text-xs text-neutral-500 dark:text-neutral-500">
-                                            {translate(`الحد الأقصى ${MAX_IMAGES} صور`, `Max ${MAX_IMAGES} images`)}
-                                        </p>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-
-                    <input type="file" className="hidden" ref={fileInputRef} multiple onChange={handleFileChange} accept="image/*" tabIndex={-1} />
-                    <input type="file" className="hidden" ref={postSubmitFileInputRef} multiple onChange={handleFileChange} accept="image/*" tabIndex={-1} />
-
-                    {(attachments.length > 0 || uploadQueue.length > 0) && (
-                        <div className="flex flex-row gap-2 overflow-x-auto py-2 max-h-32 z-10 px-1">
-                            {attachments.map((attachment, index) => (
-                                <AttachmentPreview
-                                    key={attachment.url}
-                                    attachment={attachment}
-                                    onRemove={() => removeAttachment(index)}
-                                    isUploading={false}
-                                />
-                            ))}
-                            {uploadQueue.map((filename) => (
-                                <AttachmentPreview
-                                    key={filename}
-                                    attachment={{
-                                        url: "",
-                                        name: filename,
-                                        contentType: "",
-                                        size: 0,
-                                    } as Attachment}
-                                    onRemove={() => { }}
-                                    isUploading={true}
-                                />
-                            ))}
-                        </div>
-                    )}
-
-                    <div className="relative rounded-lg bg-neutral-100 dark:bg-neutral-900">
-                        <Textarea
-                            ref={inputRef}
-                            placeholder={getPlaceholderText()}
-                            value={input}
-                            onChange={handleInput}
-                            disabled={isProcessing}
-                            onFocus={handleFocus}
-                            onBlur={handleBlur}
-                            className={cn(
-                                "min-h-[72px] w-full resize-none rounded-lg",
-                                "text-base leading-relaxed",
-                                "bg-neutral-100 dark:bg-neutral-900",
-                                "border !border-neutral-200 dark:!border-neutral-700",
-                                "focus:!border-neutral-300 dark:focus:!border-neutral-600",
-                                isFocused ? "!border-neutral-300 dark:!border-neutral-600" : "",
-                                "text-neutral-900 dark:text-neutral-100",
-                                "focus:!ring-1 focus:!ring-neutral-300 dark:focus:!ring-neutral-600",
-                                "px-4 py-4 pb-16",
-                                "overflow-y-auto",
-                                "touch-manipulation",
-                                direction === 'rtl' ? "text-right" : "text-left",
-                                language === 'ar' ? 'font-tajawal' : 'font-montserrat'
-                            )}
-                            style={{
-                                maxHeight: `${MAX_HEIGHT}px`,
-                                WebkitUserSelect: 'text',
-                                WebkitTouchCallout: 'none',
-                                direction: direction,
-                            }}
-                            rows={1}
-                            autoFocus={width ? width > 768 : true}
-                            onKeyDown={handleKeyDown}
-                            onPaste={handlePaste}
-                            dir={direction}
-                        />
-
-                        {/* Character counter with responsive positioning */}
-                        {input.length > 0 && (
-                            <div className="absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 z-10">
-                                <CharacterCounter current={input.length} max={MAX_INPUT_CHARS} />
+        <div
+            className={cn(
+                "relative w-full flex flex-col gap-2 rounded-lg transition-all duration-300 !font-sans",
+                hasInteracted ? "z-[51]" : "",
+                isDragging && "ring-1 ring-neutral-300 dark:ring-neutral-700",
+                attachments.length > 0 || uploadQueue.length > 0
+                    ? "bg-gray-100/70 dark:bg-neutral-800 p-1"
+                    : "bg-transparent"
+            )}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+        >
+            <AnimatePresence>
+                {isDragging && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="absolute inset-0 backdrop-blur-[2px] bg-background/80 dark:bg-neutral-900/80 rounded-lg border border-dashed border-neutral-300 dark:border-neutral-700 flex items-center justify-center z-50 m-2"
+                    >
+                        <div className="flex items-center gap-4 px-6 py-8">
+                            <div className="p-3 rounded-full bg-neutral-100 dark:bg-neutral-800 shadow-sm">
+                                <Upload className="h-6 w-6 text-neutral-600 dark:text-neutral-400" />
                             </div>
-                        )}
+                            <div className="space-y-1 text-center">
+                                <p className="text-sm font-medium text-neutral-600 dark:text-neutral-400">
+                                    {translate("أسقط الصور هنا", "Drop images here")}
+                                </p>
+                                <p className="text-xs text-neutral-500 dark:text-neutral-500">
+                                    {translate(`الحد الأقصى ${MAX_IMAGES} صور`, `Max ${MAX_IMAGES} images`)}
+                                </p>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            <input type="file" className="hidden" ref={fileInputRef} multiple onChange={handleFileChange} accept="image/*" tabIndex={-1} />
+            <input type="file" className="hidden" ref={postSubmitFileInputRef} multiple onChange={handleFileChange} accept="image/*" tabIndex={-1} />
+
+            {(attachments.length > 0 || uploadQueue.length > 0) && (
+                <div className="flex flex-row gap-2 overflow-x-auto py-2 max-h-32 z-10 px-1">
+                    {attachments.map((attachment, index) => (
+                        <AttachmentPreview
+                            key={attachment.url}
+                            attachment={attachment}
+                            onRemove={() => removeAttachment(index)}
+                            isUploading={false}
+                        />
+                    ))}
+                    {uploadQueue.map((filename) => (
+                        <AttachmentPreview
+                            key={filename}
+                            attachment={{
+                                url: "",
+                                name: filename,
+                                contentType: "",
+                                size: 0,
+                            } as Attachment}
+                            onRemove={() => { }}
+                            isUploading={true}
+                        />
+                    ))}
+                </div>
+            )}
+
+            <div className="relative rounded-lg bg-neutral-100 dark:bg-neutral-900">
+                <Textarea
+                    ref={inputRef}
+                    placeholder={getPlaceholderText()}
+                    value={input}
+                    onChange={handleInput}
+                    disabled={isProcessing}
+                    onFocus={handleFocus}
+                    onBlur={handleBlur}
+                    className={cn(
+                        "min-h-[72px] w-full resize-none rounded-lg",
+                        "text-base leading-relaxed",
+                        "bg-neutral-100 dark:bg-neutral-900",
+                        "border !border-neutral-200 dark:!border-neutral-700",
+                        "focus:!border-neutral-300 dark:focus:!border-neutral-600",
+                        isFocused ? "!border-neutral-300 dark:!border-neutral-600" : "",
+                        "text-neutral-900 dark:text-neutral-100",
+                        "focus:!ring-1 focus:!ring-neutral-300 dark:focus:!ring-neutral-600",
+                        "px-4 py-4 pb-16",
+                        "overflow-y-auto",
+                        "touch-manipulation",
+                        direction === 'rtl' ? "text-right" : "text-left",
+                        language === 'ar' ? 'font-tajawal' : 'font-montserrat'
+                    )}
+                    style={{
+                        maxHeight: `${MAX_HEIGHT}px`,
+                        WebkitUserSelect: 'text',
+                        WebkitTouchCallout: 'none',
+                        direction: direction,
+                    }}
+                    rows={1}
+                    autoFocus={width ? width > 768 : true}
+                    onKeyDown={handleKeyDown}
+                    onPaste={handlePaste}
+                    dir={direction}
+                />
+
+                {/* Character counter with responsive positioning */}
+                {input.length > 0 && (
+                    <div className="absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 z-10">
+                        <CharacterCounter current={input.length} max={MAX_INPUT_CHARS} />
+                    </div>
+                )}
+
+                <div className={cn(
+                    "absolute bottom-0 inset-x-0 flex justify-between items-center p-2 rounded-b-lg",
+                    "bg-neutral-100 dark:bg-neutral-900",
+                    "!border !border-t-0 !border-neutral-200 dark:!border-neutral-700",
+                    isFocused ? "!border-neutral-300 dark:!border-neutral-600" : "",
+                    isProcessing ? "!opacity-20 !cursor-not-allowed" : ""
+                )}>
+                    <div className={cn(
+                        "flex items-center gap-2",
+                        isMobile && "overflow-hidden"
+                    )}>
+                        <div className={cn(
+                            "transition-all duration-100",
+                            (selectedGroup !== 'extreme')
+                                ? "opacity-100 visible w-auto"
+                                : "opacity-0 invisible w-0"
+                        )}>
+                            <GroupSelector
+                                selectedGroup={selectedGroup}
+                                onGroupSelect={handleGroupSelect}
+                                status={status}
+                                onExpandChange={setIsGroupSelectorExpanded}
+                            />
+                        </div>
 
                         <div className={cn(
-                            "absolute bottom-0 inset-x-0 flex justify-between items-center p-2 rounded-b-lg",
-                            "bg-neutral-100 dark:bg-neutral-900",
-                            "!border !border-t-0 !border-neutral-200 dark:!border-neutral-700",
-                            isFocused ? "!border-neutral-300 dark:!border-neutral-600" : "",
-                            isProcessing ? "!opacity-20 !cursor-not-allowed" : ""
+                            "transition-all duration-300",
+                            (isMobile && isGroupSelectorExpanded) ? "opacity-0 w-0 invisible" : "opacity-100 visible w-auto"
                         )}>
-                            <div className={cn(
-                                "flex items-center gap-2",
-                                isMobile && "overflow-hidden"
-                            )}>
-                                <div className={cn(
-                                    "transition-all duration-100",
-                                    (selectedGroup !== 'extreme')
-                                    ? "opacity-100 visible w-auto"
-                                    : "opacity-0 invisible w-0"
-                                )}>
-                                    <GroupSelector
-                                        selectedGroup={selectedGroup}
-                                        onGroupSelect={handleGroupSelect}
-                                        status={status}
-                                        onExpandChange={setIsGroupSelectorExpanded}
-                                    />
-                                </div>
+                            <ModelSwitcher
+                                selectedModel={selectedModel}
+                                setSelectedModel={setSelectedModel}
+                                showExperimentalModels={showExperimentalModels}
+                                attachments={attachments}
+                                messages={messages}
+                                status={status}
+                            />
+                        </div>
 
-                                <div className={cn(
-                                    "transition-all duration-300",
-                                    (isMobile && isGroupSelectorExpanded)
-                                        ? "opacity-0 invisible w-0"
-                                        : "opacity-100 visible w-auto"
-                                )}>
-                                    <ModelSwitcher
-                                        selectedModel={selectedModel}
-                                        setSelectedModel={setSelectedModel}
-                                        showExperimentalModels={showExperimentalModels}
-                                        attachments={attachments}
-                                        messages={messages}
-                                        status={status}
-                                    />
-                                </div>
-
-                                <div className={cn(
-                                    "transition-all duration-300",
-                                    (isMobile && isGroupSelectorExpanded)
-                                        ? "opacity-0 invisible w-0"
-                                        : "opacity-100 visible w-auto"
-                                )}>
-                                    <button
-                                        onClick={() => {
-                                            setSelectedGroup(selectedGroup === 'extreme' ? 'web' : 'extreme');
-                                            // Show toast notification on mobile devices
-                                            if (isMobile) {
-                                                const newMode = selectedGroup === 'extreme' 
-                                                    ? translate('البحث العادي', 'Web Search') 
-                                                    : translate('الوضع المتقدم', 'Extreme Mode');
-                                                const description = selectedGroup === 'extreme' 
-                                                    ? translate('وضع البحث العادي على الويب', 'Standard web search mode')
-                                                    : translate('وضع البحث المتقدم والعميق', 'Enhanced deep research mode');
-                                                toast.success(translate(
-                                                    `تم التبديل إلى ${newMode}: ${description}`,
-                                                    `Switched to ${newMode}: ${description}`
-                                                ));
-                                            }
-                                        }}
-                                        className={cn(
-                                            "flex items-center gap-2 p-2 sm:px-3 h-8",
-                                            "rounded-full transition-all duration-300",
-                                            "border border-neutral-200 dark:border-neutral-800",
-                                            "hover:shadow-md",
-                                            selectedGroup === 'extreme'
-                                                ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900"
-                                                : "bg-white dark:bg-neutral-900 text-neutral-500",
-                                        )}
-                                    >
-                                        <Mountain className="h-3.5 w-3.5" />
-                                        <span className="hidden sm:block text-xs font-medium">
-                                            {translate('متقدم', 'Extreme')}
-                                        </span>
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                {hasVisionSupport(selectedModel) && !(isMobile && isGroupSelectorExpanded) && (
-                                    <Button
-                                        className="rounded-full p-1.5 h-8 w-8 bg-white dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-600"
-                                        onClick={(event) => {
-                                            event.preventDefault();
-                                            triggerFileInput();
-                                        }}
-                                        variant="outline"
-                                        disabled={isProcessing}
-                                    >
-                                        <PaperclipIcon size={14} />
-                                    </Button>
+                        <div className={cn(
+                            "transition-all duration-300",
+                            (isMobile && isGroupSelectorExpanded)
+                                ? "opacity-0 invisible w-0"
+                                : "opacity-100 visible w-auto"
+                        )}>
+                            <button
+                                onClick={() => {
+                                    setSelectedGroup(selectedGroup === 'extreme' ? 'web' : 'extreme');
+                                    // Show toast notification on mobile devices
+                                    if (isMobile) {
+                                        const newMode = selectedGroup === 'extreme' 
+                                            ? translate('البحث العادي', 'Web Search') 
+                                            : translate('الوضع المتقدم', 'Extreme Mode');
+                                        const description = selectedGroup === 'extreme' 
+                                            ? translate('وضع البحث العادي على الويب', 'Standard web search mode')
+                                            : translate('وضع البحث المتقدم والعميق', 'Enhanced deep research mode');
+                                        toast.success(translate(
+                                            `تم التبديل إلى ${newMode}: ${description}`,
+                                            `Switched to ${newMode}: ${description}`
+                                        ));
+                                    }
+                                }}
+                                className={cn(
+                                    "flex items-center gap-2 p-2 sm:px-3 h-8",
+                                    "rounded-full transition-all duration-300",
+                                    "border border-neutral-200 dark:border-neutral-800",
+                                    "hover:shadow-md",
+                                    selectedGroup === 'extreme'
+                                        ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900"
+                                        : "bg-white dark:bg-neutral-900 text-neutral-500",
                                 )}
-
-                                {isProcessing ? (
-                                    <Button
-                                        className="rounded-full p-1.5 h-8 w-8"
-                                        onClick={(event) => {
-                                            event.preventDefault();
-                                            stop();
-                                        }}
-                                        variant="destructive"
-                                    >
-                                        <StopIcon size={14} />
-                                    </Button>
-                                ) : (
-                                    <Button
-                                        className="rounded-full p-1.5 h-8 w-8"
-                                        onClick={(event) => {
-                                            event.preventDefault();
-                                            submitForm();
-                                        }}
-                                        disabled={input.length === 0 && attachments.length === 0 || uploadQueue.length > 0 || status !== 'ready'}
-                                    >
-                                        <ArrowUpIcon size={14} />
-                                    </Button>
-                                )}
-                            </div>
+                            >
+                                <Mountain className="h-3.5 w-3.5" />
+                                <span className="hidden sm:block text-xs font-medium">
+                                    {translate('متقدم', 'Extreme')}
+                                </span>
+                            </button>
                         </div>
                     </div>
 
-                    <SuggestedQuestions
-                        selectedGroup={selectedGroup}
-                        onQuestionClick={handleQuestionClick}
-                        clearSuggestions={() => setShowSuggestions(false)}
-                        showSuggestions={showSuggestions && !isProcessing && messages.length === 0}
-                    />
+                    <div className="flex items-center gap-2">
+                        {hasVisionSupport(selectedModel) && !(isMobile && isGroupSelectorExpanded) && (
+                            <Button
+                                className="rounded-full p-1.5 h-8 w-8 bg-white dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300 hover:bg-neutral-300 dark:hover:bg-neutral-600"
+                                onClick={(event) => {
+                                    event.preventDefault();
+                                    triggerFileInput();
+                                }}
+                                variant="outline"
+                                disabled={isProcessing}
+                            >
+                                <PaperclipIcon size={14} />
+                            </Button>
+                        )}
+
+                        {isProcessing ? (
+                            <Button
+                                className="rounded-full p-1.5 h-8 w-8"
+                                onClick={(event) => {
+                                    event.preventDefault();
+                                    stop();
+                                }}
+                                variant="destructive"
+                            >
+                                <StopIcon size={14} />
+                            </Button>
+                        ) : (
+                            <Button
+                                className="rounded-full p-1.5 h-8 w-8"
+                                onClick={(event) => {
+                                    event.preventDefault();
+                                    submitForm();
+                                }}
+                                disabled={input.length === 0 && attachments.length === 0 || uploadQueue.length > 0 || status !== 'ready'}
+                            >
+                                <ArrowUpIcon size={14} />
+                            </Button>
+                        )}
+                    </div>
                 </div>
-            </form>
+            </div>
+
+            <SuggestedQuestions
+                selectedGroup={selectedGroup}
+                onQuestionClick={handleQuestionClick}
+                clearSuggestions={() => setShowSuggestions(false)}
+                showSuggestions={showSuggestions && !isProcessing && messages.length === 0}
+            />
         </div>
     );
 };

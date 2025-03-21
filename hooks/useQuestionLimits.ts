@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { createClientComponent } from '@/lib/supabase';
+import { getSupabaseClient } from '@/lib/supabase';
 import { useAuth } from './useAuth';
 import { toast } from 'sonner';
 
@@ -10,7 +10,7 @@ const RESET_PERIOD_DAYS = 3; // فترة إعادة تعيين العداد با
 
 export function useQuestionLimits() {
   const { user } = useAuth();
-  const supabase = createClientComponent();
+  const supabase = getSupabaseClient();
   const [questionsCount, setQuestionsCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isPaidUser, setIsPaidUser] = useState(false);

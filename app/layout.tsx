@@ -11,6 +11,7 @@ import { Providers } from './providers';
 import { LanguageProvider } from '@/app/language-context';
 import { ThemeProvider } from '@/components/ui/theme-provider';
 import { cn } from '@/lib/utils';
+import { createAIDataBucketIfNotExists } from '@/lib/supabase';
 
 const tajawal = Tajawal({
   subsets: ['arabic'],
@@ -27,6 +28,19 @@ const montserrat = Montserrat({
   preload: true,
   display: 'swap',
 });
+
+// Server-side initialization
+createAIDataBucketIfNotExists()
+  .then(result => {
+    if (result.success) {
+      console.log('AI data bucket initialization complete');
+    } else {
+      console.error('Failed to initialize AI data bucket:', result.error);
+    }
+  })
+  .catch(error => {
+    console.error('Error during AI data bucket initialization:', error);
+  });
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://dhaki.ai'),
