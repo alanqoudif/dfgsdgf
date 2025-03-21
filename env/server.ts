@@ -28,4 +28,6 @@ export const serverEnv = createEnv({
     MEM0_PROJECT_NAME: z.string().optional().default("dummy_value"),
   },
   experimental__runtimeEnv: process.env,
+  skipValidation: !!process.env.SKIP_ENV_VALIDATION || process.env.NODE_ENV === 'production',
+  emptyStringAsUndefined: true,
 })
