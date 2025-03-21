@@ -25,7 +25,7 @@ import { z } from 'zod';
 import { geolocation } from '@vercel/functions';
 import MemoryClient from 'mem0ai';
 import { type NextRequest } from 'next/server';
-import { AIMessage, HumanMessage, SystemMessage } from 'langchain/schema';
+import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { LangChainStream } from 'ai';
 import { ChatOpenAI } from '@langchain/openai';
 import { checkUserLimit, saveQuestion } from '@/lib/supabase';
